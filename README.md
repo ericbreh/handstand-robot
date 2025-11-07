@@ -10,6 +10,7 @@ Kinematic modelling, dynamics, and simulation of a handstand robot.
 ---
 
 ## Tree: 
+```
 Handstand-Robot/
 ├── classical_controls/
 │ ├── animate/ # Animation scripts and visualization tools
@@ -20,7 +21,7 @@ Handstand-Robot/
 │
 ├── documents/ # Notes, derivations, and references
 └── rl/ # Reinforcement learning experiments (WIP)
-
+```
 ---
 
 ## To run classical controls:
