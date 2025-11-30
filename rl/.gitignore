@@ -1,0 +1,35 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+env/
+handstand-robot/
+
+# MuJoCo cache
+mjcache/
+.mujoco/
+
+# TensorBoard logs
+runs/
+
+# Model checkpoints
+*.zip
+*.pth
+*.pt
+
+# Build / dist artifacts
+bin/
+build/
+dist/
+*.egg-info/
+
+# VSCode settings
+.vscode/
+
+# System files
+.DS_Store
+Thumbs.db
