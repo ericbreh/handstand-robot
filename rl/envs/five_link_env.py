@@ -36,82 +36,36 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         rot_matrix = self.data.body("torso").xmat.reshape(3, 3)
         verticality = rot_matrix[2, 2] 
 
-        touch_sensors = self.data.sensordata[-4:] 
-        hand_contact = np.sum(touch_sensors[0:2])
-        foot_contact = np.sum(touch_sensors[2:4])
+        # --- THE NUCLEAR REWARD FUNCTION ---
         
-        # Geometry Info
-        right_foot_z = self.data.site("right_foot_site").xpos[2]
-        left_foot_z = self.data.site("left_foot_site").xpos[2]
-        avg_feet_height = (right_foot_z + left_foot_z) / 2.0
-        
-        right_hand_z = self.data.site("right_hand_site").xpos[2]
-        left_hand_z = self.data.site("left_hand_site").xpos[2]
-        min_hand_height = min(right_hand_z, left_hand_z)
-
-        # --- REWARD FUNCTION ---
-        
-        # 1. Alive Bonus
-        reward_alive = 0.2
-
-        # 2. Velocity Reward
-        y_velocity = self.data.qvel[0] 
-        reward_velocity = 2.0 * abs(y_velocity) 
-
-        # 3. Spin Reward
+        # 1. Spin Reward (THE ONLY THING THAT MATTERS)
+        # We want it to rotate around the X-axis (Roll).
+        # We pay huge points for high angular velocity.
         roll_velocity = self.data.qvel[2]
-        # Base spin reward
-        reward_spin = 3.0 * abs(roll_velocity)
+        reward_spin = 10.0 * abs(roll_velocity)
 
-        # 4. Inversion Guide
-        reward_potential = 5.0 * (1.0 - verticality)
+        # 2. Inversion Reward
+        # Still useful to tell it WHICH direction to spin (upside down is good)
+        reward_inverted = 5.0 * max(0.0, -1.0 * verticality)
 
-        # 5. Feet Lift Reward
-        reward_feet_lift = 10.0 * avg_feet_height
-        
-        # 6. DIVE REWARD (The Smart Fix)
-        # Reward lowering hands ONLY if we are spinning.
-        # This prevents "squatting" for points.
-        # 1.0 - min_hand_height is big when hands are low.
-        # roll_velocity is big when flipping.
-        # Product is huge when doing a cartwheel entry.
-        reward_dive = 5.0 * (1.0 - min_hand_height) * abs(roll_velocity)
-
-        # 7. Flight Bonus
-        reward_flight = 0.0
-        if hand_contact > 0.1 and foot_contact < 0.1:
-             reward_flight = 20.0 
-
-        # 8. Handstand Bonus
+        # 3. Energy Cost (Keep it small so it doesn't discourage effort)
+        ctrl_cost = 1e-4 * np.sum(np.square(action))
+   
+        # 5. Handstand Bonus (Simplified)
+        # Just getting inverted is the goal for now.
         reward_handstand = 0.0
-        if verticality < -0.8 and hand_contact > 1.0:
-            reward_handstand = 20.0 
-            if np.linalg.norm(self.data.qvel) < 2.0:
-                reward_handstand += 30.0
+        if verticality < -0.5:
+            reward_handstand = 5.0
 
-        # 9. Penalties
-        reward_feet_penalty = 0.0
-        if verticality < 0 and foot_contact > 0.1:
-            reward_feet_penalty = -5.0
-
-        ctrl_cost = 1e-3 * np.sum(np.square(action))
-
-        reward = (reward_alive + 
-                  reward_velocity + 
-                  reward_spin + 
-                  reward_potential + 
-                  reward_feet_lift + 
-                  reward_dive + # Added the smart dive reward
-                  reward_flight + 
-                  reward_handstand + 
-                  reward_feet_penalty - 
-                  ctrl_cost)
+        # Sum it up
+        reward = reward_spin + reward_inverted + reward_handstand - ctrl_cost
 
         # --- TERMINATION ---
         terminated = False
-        if torso_z < 0.3: 
+        # Lower the death threshold so it can struggle on the floor a bit
+        if torso_z < 0.25: 
             terminated = True
-            reward -= 10.0 
+            reward -= 10.0 # Small penalty. Failure is okay, inactivity is not.
             
         if self.render_mode == "human":
             self.render()
@@ -124,9 +78,21 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         qpos = self.init_qpos + self.np_random.uniform(low=noise_low, high=noise_high, size=self.model.nq)
         qvel = self.init_qvel + self.np_random.uniform(low=noise_low, high=noise_high, size=self.model.nv)
         
-        qpos[0] = 0.0 
-        qpos[1] = 0.0 
-        qpos[2] = 0.0 
+        # --- THE FIX: RANDOMIZED START ---
+        # 50% chance to spawn in a "Pre-Cartwheel" state
+        if self.np_random.random() > 0.5:
+            # Tilt sideways (0.3 rad)
+            qpos[2] = 0.3 
+            # Give it a shove (Velocity)
+            qvel[0] = 1.5 # Moving left
+            qvel[2] = 2.0 # Spinning left
+            # Lift the leg (q3 is index 5)
+            qpos[5] = 0.8 
+        else:
+            # Standard start
+            qpos[0] = 0.0 
+            qpos[1] = 0.0 
+            qpos[2] = 0.0 
 
         self.set_state(qpos, qvel)
         return self._get_obs()
