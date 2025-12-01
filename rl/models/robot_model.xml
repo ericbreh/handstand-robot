@@ -1,11 +1,12 @@
-<!-- MuJoCo Model for the 5-Link Cartwheel System (v17 - Fixed Spawn Height) -->
+<!-- MuJoCo Model for the 5-Link Cartwheel System (v18 - SUPER STRONG MOTORS) -->
 <mujoco model="FiveLinkHumanoid">
 
     <compiler angle="degree" inertiafromgeom="true" meshdir="assets" discardvisual="false"/>
     <option timestep="0.005" gravity="0 0 -9.81"/>
 
     <default>
-        <joint armature="0.1" damping="1.0" limited="true"/>
+        <!-- Increased armature for stability with high torque -->
+        <joint armature="0.5" damping="1.0" limited="true"/>
         <geom conaffinity="1" condim="3" friction="1.0 0.5 0.5" solimp="0.9 0.95 0.001" solref="0.02 1"/>
     </default>
 
@@ -25,8 +26,7 @@
     <worldbody>
         <geom name="ground" type="plane" size="0 0 1" material="MatPlane" condim="3"/>
 
-        <!-- Root Body: Torso -->
-        <!-- FIX: Set pos back to 1.25 so it spawns ON the ground, not IN it -->
+        <!-- Root Body: Torso (Start at 1.25m) -->
         <body name="torso" pos="0 0 1.25">
             
             <!-- PLANAR JOINTS -->
@@ -66,10 +66,12 @@
     </worldbody>
 
     <actuator>
-        <motor name="m_q1" joint="joint_q1" ctrlrange="-200 200"/>
-        <motor name="m_q2" joint="joint_q2" ctrlrange="-200 200"/>
-        <motor name="m_q3" joint="joint_q3" ctrlrange="-300 300"/>
-        <motor name="m_q4" joint="joint_q4" ctrlrange="-300 300"/>
+        <!-- BOOSTED TORQUE: 500 for arms, 1000 for legs -->
+        <!-- This ensures it has enough power to kick off the ground explosively -->
+        <motor name="m_q1" joint="joint_q1" ctrlrange="-500 500"/>
+        <motor name="m_q2" joint="joint_q2" ctrlrange="-500 500"/>
+        <motor name="m_q3" joint="joint_q3" ctrlrange="-1000 1000"/>
+        <motor name="m_q4" joint="joint_q4" ctrlrange="-1000 1000"/>
     </actuator>
 
     <sensor>

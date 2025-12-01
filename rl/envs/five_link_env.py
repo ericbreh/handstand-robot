@@ -33,7 +33,6 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         
         # --- EXTRACT INFO ---
         torso_z = self.data.body("torso").xpos[2] 
-        
         rot_matrix = self.data.body("torso").xmat.reshape(3, 3)
         verticality = rot_matrix[2, 2] 
 
@@ -41,48 +40,59 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         hand_contact = np.sum(touch_sensors[0:2])
         foot_contact = np.sum(touch_sensors[2:4])
         
-        # Get Feet Heights (To break the "stretching" habit)
+        # Geometry Info
         right_foot_z = self.data.site("right_foot_site").xpos[2]
         left_foot_z = self.data.site("left_foot_site").xpos[2]
         avg_feet_height = (right_foot_z + left_foot_z) / 2.0
+        
+        right_hand_z = self.data.site("right_hand_site").xpos[2]
+        left_hand_z = self.data.site("left_hand_site").xpos[2]
+        min_hand_height = min(right_hand_z, left_hand_z)
 
         # --- REWARD FUNCTION ---
         
         # 1. Alive Bonus
-        reward_alive = 0.5
+        reward_alive = 0.2
 
-        # 2. Velocity Reward (Momentum)
+        # 2. Velocity Reward
         y_velocity = self.data.qvel[0] 
         reward_velocity = 2.0 * abs(y_velocity) 
 
-        # 3. Spin Reward (Rotation)
+        # 3. Spin Reward
         roll_velocity = self.data.qvel[2]
+        # Base spin reward
         reward_spin = 3.0 * abs(roll_velocity)
 
         # 4. Inversion Guide
-        reward_potential = 7.0 * (1.0 - verticality)
+        reward_potential = 5.0 * (1.0 - verticality)
 
-        # 5. Feet Height Reward (The key fix for stretching)
-        # 0.0 (ground) -> 0 pts. 1.9m (inverted) -> 19 pts.
-        reward_feet_lift = 15.0 * avg_feet_height
+        # 5. Feet Lift Reward
+        reward_feet_lift = 10.0 * avg_feet_height
         
-        # 6. Flight Bonus
-        # Hands down + Feet up = Huge Bonus
+        # 6. DIVE REWARD (The Smart Fix)
+        # Reward lowering hands ONLY if we are spinning.
+        # This prevents "squatting" for points.
+        # 1.0 - min_hand_height is big when hands are low.
+        # roll_velocity is big when flipping.
+        # Product is huge when doing a cartwheel entry.
+        reward_dive = 5.0 * (1.0 - min_hand_height) * abs(roll_velocity)
+
+        # 7. Flight Bonus
         reward_flight = 0.0
         if hand_contact > 0.1 and foot_contact < 0.1:
              reward_flight = 20.0 
 
-        # 7. Handstand Bonus
+        # 8. Handstand Bonus
         reward_handstand = 0.0
         if verticality < -0.8 and hand_contact > 1.0:
             reward_handstand = 20.0 
             if np.linalg.norm(self.data.qvel) < 2.0:
                 reward_handstand += 30.0
 
-        # 8. Penalties
+        # 9. Penalties
         reward_feet_penalty = 0.0
         if verticality < 0 and foot_contact > 0.1:
-            reward_feet_penalty = -5.0 
+            reward_feet_penalty = -5.0
 
         ctrl_cost = 1e-3 * np.sum(np.square(action))
 
@@ -91,6 +101,7 @@ class FiveLinkCartwheelEnv(MujocoEnv):
                   reward_spin + 
                   reward_potential + 
                   reward_feet_lift + 
+                  reward_dive + # Added the smart dive reward
                   reward_flight + 
                   reward_handstand + 
                   reward_feet_penalty - 
