@@ -41,50 +41,66 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         hand_contact = np.sum(touch_sensors[0:2])
         foot_contact = np.sum(touch_sensors[2:4])
         
-        # --- REWARD FUNCTION (AGGRESSIVE UPDATE) ---
+        # Get Feet Heights (To break the "stretching" habit)
+        right_foot_z = self.data.site("right_foot_site").xpos[2]
+        left_foot_z = self.data.site("left_foot_site").xpos[2]
+        avg_feet_height = (right_foot_z + left_foot_z) / 2.0
+
+        # --- REWARD FUNCTION ---
         
-        # 1. Alive Bonus (SLASHED)
-        # Standing still gets you 500 pts total. Not enough to be satisfied.
-        # But still better than crashing (-100).
+        # 1. Alive Bonus
         reward_alive = 0.5
 
-        # 2. Velocity Reward (BOOSTED)
-        # Increased from 0.5 to 5.0. 
-        # Moving sideways is now the MAIN source of income for the first phase.
-        # It forces the robot to step/lean/run sideways.
+        # 2. Velocity Reward (Momentum)
         y_velocity = self.data.qvel[0] 
-        reward_velocity = 5.0 * abs(y_velocity) 
+        reward_velocity = 2.0 * abs(y_velocity) 
 
-        # 3. Inversion Reward (The Jackpot)
-        reward_inverted = 10.0 * max(0.0, -1.0 * verticality)
+        # 3. Spin Reward (Rotation)
+        roll_velocity = self.data.qvel[2]
+        reward_spin = 3.0 * abs(roll_velocity)
+
+        # 4. Inversion Guide
+        reward_potential = 7.0 * (1.0 - verticality)
+
+        # 5. Feet Height Reward (The key fix for stretching)
+        # 0.0 (ground) -> 0 pts. 1.9m (inverted) -> 19 pts.
+        reward_feet_lift = 15.0 * avg_feet_height
         
-        # 4. Handstand Bonus
+        # 6. Flight Bonus
+        # Hands down + Feet up = Huge Bonus
+        reward_flight = 0.0
+        if hand_contact > 0.1 and foot_contact < 0.1:
+             reward_flight = 20.0 
+
+        # 7. Handstand Bonus
         reward_handstand = 0.0
         if verticality < -0.8 and hand_contact > 1.0:
-            reward_handstand = 5.0
+            reward_handstand = 20.0 
             if np.linalg.norm(self.data.qvel) < 2.0:
-                reward_handstand += 5.0
+                reward_handstand += 30.0
 
-        # 6. Foot Contact Penalty
-        reward_feet = 0.0
+        # 8. Penalties
+        reward_feet_penalty = 0.0
         if verticality < 0 and foot_contact > 0.1:
-            reward_feet = -5.0
+            reward_feet_penalty = -5.0 
 
         ctrl_cost = 1e-3 * np.sum(np.square(action))
 
-        # Sum it all up
         reward = (reward_alive + 
                   reward_velocity + 
-                  reward_inverted + 
+                  reward_spin + 
+                  reward_potential + 
+                  reward_feet_lift + 
+                  reward_flight + 
                   reward_handstand + 
-                  reward_feet - 
+                  reward_feet_penalty - 
                   ctrl_cost)
 
         # --- TERMINATION ---
         terminated = False
         if torso_z < 0.3: 
             terminated = True
-            reward -= 100.0
+            reward -= 10.0 
             
         if self.render_mode == "human":
             self.render()
