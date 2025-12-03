@@ -3,6 +3,7 @@ from gymnasium.envs.registration import register
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
 import os
 import datetime
@@ -16,13 +17,13 @@ from envs.five_link_env import FiveLinkCartwheelEnv
 register(
     id="FiveLinkCartwheel-v0",
     entry_point="envs.five_link_env:FiveLinkCartwheelEnv",
-    max_episode_steps=400, 
+    max_episode_steps=100, 
 )
 
 # --- CONFIGURATION ---
 CONTINUE_FROM_LATEST = False  # <--- CHANGED: Forces a fresh start
-TOTAL_TIMESTEPS = 5_000_000 
-SAVE_FREQ = 100_0000         
+TOTAL_TIMESTEPS = 1_000_000 
+SAVE_FREQ = 100_000         
 
 # --- CUSTOM CALLBACK TO SAVE MATCHED STATS ---
 class SaveMatchedStatsCallback(BaseCallback):
@@ -75,7 +76,7 @@ def train_agent():
     print(f"--- STARTING NEW RUN: {run_name} ---")
 
     env_id = "FiveLinkCartwheel-v0"
-    vec_env = make_vec_env(env_id, n_envs=4, seed=0, vec_env_cls=DummyVecEnv)
+    vec_env = make_vec_env(env_id, n_envs=10, seed=0, vec_env_cls=SubprocVecEnv)
 
     model = None
     previous_run = get_previous_run(current_run_name=run_name)
@@ -90,18 +91,19 @@ def train_agent():
 
     if model is None:
         model = PPO(
-            "MlpPolicy", 
+            "MlpPolicy",
             vec_env, 
             verbose=1, 
             learning_rate=3e-4, 
-            n_steps=2048,
+            n_steps=2048 // 8,
             batch_size=64,
             n_epochs=10,
             gamma=0.99,
             gae_lambda=0.95,
             clip_range=0.2,
             ent_coef=0.01, 
-            tensorboard_log=log_dir 
+            tensorboard_log=log_dir,
+            device="cpu"
         )
 
     print(f"Training for {TOTAL_TIMESTEPS/1e6:.1f}M steps...")

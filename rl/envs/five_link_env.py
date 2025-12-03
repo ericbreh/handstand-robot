@@ -33,9 +33,6 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         
         # --- EXTRACT INFO ---
         torso_z = self.data.body("torso").xpos[2] 
-        rot_matrix = self.data.body("torso").xmat.reshape(3, 3)
-        verticality = rot_matrix[2, 2] 
-
 
         #  !! REWARD SHAPING !!
 

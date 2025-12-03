@@ -17,261 +17,207 @@ clear all; close all; clc;
 
 % ---------------------------- Symbolic Setup -----------------------------
 % Define Symbolic Variables for 5-link system
-syms x y phi q1 q2 q3 q4 real
-syms xdot ydot phidot q1dot q2dot q3dot q4dot real
-syms xddot yddot phiddot q1ddot q2ddot q3ddot q4ddot real
-syms mt It wt lt dtx dty real
-syms m1 I1 l1 d1 real
-syms m2 I2 l2 d2 real
-syms m3 I3 l3 d3 real
-syms m4 I4 l4 d4 real
-syms g real
-Pi = sym(pi);
+% x: x position of hip joint
+% y: y position of hip joint
+% q1: stance leg angle
+% q2: swing leg angle
+% q3: right arm (initially) angle
+% q4: left arm (initially) angle
+% q5: torso angle
+syms x y q1 q2 q3 q4 q5 real
+syms xdot ydot q1dot q2dot q3dot q4dot q5dot real
+syms u1 u2 u3 u4 real
+
+% Lengths [m]
+l_L = 1; % leg
+l_T = 0.5; % torso
+l_A = 0.75; % arm
+
+% Masses [kg]
+m_L = 2; % leg
+m_T = 4; % torso
+m_A = 1; % arm
+m_H = 5; % hip
+m_S = 1; % shoulder
+
+% Inertias [kg m^2]
+J_L = 0; % leg
+J_T = 0; % torso
+J_A = 0; %arm
+
+% World Parameters
+g = 9.81; % gravity [m / s^2]
 
 % Generalized coords and rates
-q  = [x; y; phi; q1; q2; q3; q4];
-dq = [xdot; ydot; phidot; q1dot; q2dot; q3dot; q4dot];
-ddq = [xddot; yddot; phiddot; q1ddot; q2ddot; q3ddot; q4ddot];
+q  = [x; y; q1; q2; q3; q4; q5];
+qdot = [xdot; ydot; q1dot; q2dot; q3dot; q4dot; q5dot];
 
-% ----------------------- Torso Rotation Matrix ---------------------------
-% Define rotation matrix of torso
-R = [cos(phi)  -sin(phi);
-     sin(phi)   cos(phi)];
+% State vector
+s = [q; qdot];
 
-% Define time derivative rotation matrix of torso
-Rdot = phidot*[-sin(phi)    -cos(phi);
-                cos(phi)    -sin(phi)]; 
+% Inputs
+u = [u1; u2; u3; u4];
+
+NDoF = length(q);
 
 % -------------------------- Forward kinematics ---------------------------
-% COM of torso
-pt = [x;y] + R*[dtx; dty];
+% COM Positions
+p_H = [x; 
+       y];
 
-% COM of link1 (right arm)
-p1 = [x;y] + R*[ wt/2 + d1*sin(-q1);
-                 lt/2 + d1*cos(-q1)];
+p_S = [x + l_T*sin(q5);
+       y + l_T*cos(q5)];
 
-% COM of link2 (left arm)
-p2 = [x;y] + R*[ -wt/2 - d2*sin(q2);
-                 lt/2 + d2*cos(q2)];
+p_com_T = [x + l_T/2*sin(q5);
+               y + l_T/2*cos(q5)];
 
-% COM of link3 (right leg)
-p3 = [x;y] + R*[ wt/2 + d3*sin(q3);
-                 -lt/2 - d3*cos(q3)];
+p_com_L1 = [x + l_L/2*sin(q1 + q5);
+            y + l_L/2*cos(q1 + q5)];
 
-% COM of link4 (left leg)
-p4 = [x;y] + R*[ -wt/2 - d4*sin(-q4);
-                 -lt/2 - d4*cos(-q4)];
+p_com_L2 = [x + l_L/2*sin(q2 + q5);
+            y + l_L/2*cos(q2 + q5)];
 
-% Right hand position
-p_rhand = [x;y] + R*[ wt/2 + l1*sin(-q1);
-                 lt/2 + l1*cos(-q1)];
+p_com_A3 = [x + l_T*sin(q5) + l_A/2*sin(q3 + q5);
+            y + l_T*cos(q5) + l_A/2*cos(q3 + q5)];
 
-% Left hand position
-p_lhand = [x;y] + R*[ -wt/2 - l2*sin(q2);
-                 lt/2 + l2*cos(q2)];
+p_com_A4 = [x + l_T*sin(q5) + l_A/2*sin(q4 + q5);
+            y + l_T*cos(q5) + l_A/2*cos(q4 + q5)];
 
-% Right foot position
-p_rfoot = [x;y] + R*[ wt/2 + l3*sin(q3);
-                 -lt/2 - l3*cos(q3)];
+% End-effector Positions
+p_L1 = [x + l_L*sin(q1 + q5);
+        y + l_L*cos(q1 + q5)];
 
-% Left foot position
-p_lfoot = [x;y] + R*[ -wt/2 - l4*sin(-q4);
-                 -lt/2 - l4*cos(-q4)];
+p_L2 = [x + l_L*sin(q2 + q5);
+        y + l_L*cos(q2 + q5)];
 
-% Total System COM
-pCOM = [ (mt * pt(1) + m1 * p1(1) + m2 * p2(1) + m3 * p3(1) + m4 * p4(1))/(mt + m1 + m2 + m3 + m4);
-         (mt * pt(2) + m1 * p1(2) + m2 * p2(2) + m3 * p3(2) + m4 * p4(2))/(mt + m1 + m2 + m3 + m4)];
+
+p_A3 = [x + l_T*sin(q5) + l_A*sin(q3 + q5);
+        y + l_T*cos(q5) + l_A*cos(q3 + q5)];
+
+p_A4 = [x + l_T*sin(q5) + l_A*sin(q4 + q5);
+        y + l_T*cos(q5) + l_A*cos(q4 + q5)];
+
 
 
 % ----------------------------- Velocities --------------------------------
-% linear velocities of COMs calcualted using Jacobian: v = J_q(p) * dq
-Jpt = jacobian(pt, q);    % 2x7
-Jp1 = jacobian(p1, q);
-Jp2 = jacobian(p2, q);
-Jp3 = jacobian(p3, q);
-Jp4 = jacobian(p4, q);
+% COM linear velocities
+pdot_H = simplify(jacobian(p_H, q)*qdot);
+pdot_S = simplify(jacobian(p_S, q)*qdot);
 
-vt  = simplify(Jpt * dq); % 2x1
-v1  = simplify(Jp1 * dq);
-v2  = simplify(Jp2 * dq);
-v3  = simplify(Jp3 * dq);
-v4  = simplify(Jp4 * dq);
+pdot_com_T = simplify(jacobian(p_com_T, q)*qdot);
 
-% angular velocities definition
-omegat = phidot;
-omega1 = phidot - q1dot;
-omega2 = phidot + q2dot;
-omega3 = phidot + q3dot;
-omega4 = phidot - q4dot;
+pdot_com_L1 = simplify(jacobian(p_com_L1, q)*qdot);
+pdot_com_L2 = simplify(jacobian(p_com_L2, q)*qdot);
+
+pdot_com_A3 = simplify(jacobian(p_com_A3, q)*qdot);
+pdot_com_A4 = simplify(jacobian(p_com_A4, q)*qdot);
+
+% Absolute angular velocities
+q1dot_abs = q1dot + q5dot;
+q2dot_abs = q2dot + q5dot;
+q3dot_abs = q3dot + q5dot;
+q4dot_abs = q4dot + q5dot;
+q5dot_abs = q5dot;
 
 % --------------------- Kinetic and Potential Energy ----------------------
 % Note for potential and kinetic energy we need to use position and
 % velocity of COM of each link.
 
-% kinetic energy
-Tt = simplify( (1/2)*mt*(vt.'*vt) + (1/2)*It*omegat^2 );
-T1 = simplify( (1/2)*m1*(v1.'*v1) + (1/2)*I1*omega1^2 );
-T2 = simplify( (1/2)*m2*(v2.'*v2) + (1/2)*I2*omega2^2 );
-T3 = simplify( (1/2)*m3*(v3.'*v3) + (1/2)*I3*omega3^2 );
-T4 = simplify( (1/2)*m4*(v4.'*v4) + (1/2)*I4*omega4^2 );
-T  = simplify( Tt + T1 + T2 + T3 + T4 );
+KE_H = 0.5*m_H*norm(pdot_H)^2;
+KE_S = 0.5*m_S*norm(pdot_S)^2;
+
+KE_T = 0.5*m_T*norm(pdot_com_T)^2;
+
+KE_L1 = 0.5*m_L*norm(pdot_com_L1)^2;
+KE_L2 = 0.5*m_L*norm(pdot_com_L2)^2;
+
+KE_A3 = 0.5*m_A*norm(pdot_com_A3)^2;
+KE_A4 = 0.5*m_A*norm(pdot_com_A4)^2;
+
+% Total kinetic energy
+KE = simplify(KE_H + KE_S + KE_T + KE_L1 + KE_L2 + KE_A3 + KE_A4);
 
 % potential energy
-Ut = mt * g * pt(2); % p(2) is the y-component (height)
-U1 = m1 * g * p1(2); 
-U2 = m2 * g * p2(2);
-U3 = m3 * g * p3(2);
-U4 = m4 * g * p4(2);
-U  = simplify( Ut + U1 + U2 + U3 + U4 );
+
+PE_H = m_H*g*p_H(2);
+PE_S = m_S*g*p_S(2);
+
+PE_T = m_T*g*p_com_T(2);
+
+PE_L1 = m_L*g*p_com_L1(2);
+PE_L2 = m_L*g*p_com_L2(2);
+
+PE_A3 = m_A*g*p_com_A3(2);
+PE_A4 = m_A*g*p_com_A4(2);
+
+% Total potential energy
+PE = simplify(PE_H + PE_S + PE_T + PE_L1 + PE_L2 + PE_A3 + PE_A4);
+
+% Lagrangian
+L = KE - PE;
+
+% ------------------------ Lagrangian Dynamics ----------------------------
+q_act = [q1; q2; q3; q4];
+[D, C, G, B] = LagrangianDynamics(KE, PE, q, qdot, q_act);
+
 
 % ----------- Stance Jacobian and Stance Jacobian Derivative --------------
-% This is needed for dynamic equation with constraints 
+% This is needed for dynamic equation with constraints
+p_st = p_L1;
 
-% Stance Jacobian and its derivative
-Jst_rhand = jacobian(p_rhand, q);
-Jst_lhand = jacobian(p_lhand, q);
-Jst_rfoot = jacobian(p_rfoot, q);
-Jst_lfoot = jacobian(p_lfoot, q);
+J_st = jacobian(p_st, q);
+Jdot_st = simplify(jacobian(J_st*qdot, q));
 
-Jstdot_rhand = sym('Jdot', size(Jst_rhand));  
-Jstdot_lhand = sym('Jdot', size(Jst_lhand));  
-Jstdot_rfoot = sym('Jdot', size(Jst_rfoot));  
-Jstdot_lfoot = sym('Jdot', size(Jst_lfoot));  
+P = [D, -J_st'; J_st, zeros(height(J_st), height(J_st))];
+Q = [-C*qdot - G + B*u; -Jdot_st*qdot];
+constraint_dyn = P\Q;
 
+F_st = constraint_dyn(NDof+1:end);
 
-% COM Jacobian and its derivative
-JpCOM = simplify(jacobian(pCOM, q));
+F_st_u = simplify(jacobian(F_st, u));
+F_st_nu = simplify(F_st - F_st_u*u);
 
-dJpCOM = sym('dJpCOM', size(JpCOM));
+% ----------- Impact Map ------------ %
+p_sw = p_L2;
 
+J_sw = jacobian(p_sw, q);
 
-% Compute the derivative of the Jacobian
-for i = 1:size(Jstdot_rhand,1)
-    for j = 1:size(Jstdot_rhand,2)
-        temp_rhand = 0;
-        temp_lhand = 0;
-        temp_rfoot = 0;
-        temp_lfoot = 0;
-        temp_pCOM = 0;
-
-        for k = 1:length(q)
-            temp_rhand = temp_rhand + diff(Jst_rhand(i,j), q(k)) * dq(k);
-            temp_lhand = temp_lhand + diff(Jst_lhand(i,j), q(k)) * dq(k);
-            temp_rfoot = temp_rfoot + diff(Jst_rfoot(i,j), q(k)) * dq(k);
-            temp_lfoot = temp_lfoot + diff(Jst_lfoot(i,j), q(k)) * dq(k);
-            temp_pCOM = temp_pCOM + diff(JpCOM(i,j), q(k)) * dq(k);
-        end
-
-        Jstdot_rhand(i,j) = temp_rhand;
-        Jstdot_lhand(i,j) = temp_lhand;
-        Jstdot_rfoot(i,j) = temp_rfoot;
-        Jstdot_lfoot(i,j) = temp_lfoot;
-        dJpCOM(i,j) = temp_pCOM;
-    end
-end
-
-Jstdot_rhand = simplify(Jstdot_rhand);  
-Jstdot_lhand = simplify(Jstdot_lhand);  
-Jstdot_rfoot = simplify(Jstdot_rfoot);  
-Jstdot_lfoot = simplify(Jstdot_lfoot);  
-dJpCOM = simplify(dJpCOM);
+[postimpact] = ([D, -J_sw'; J_sw, zeros(height(J_sw), height(J_sw))])\[D*dq; zeros(2, 1)];
+qdot_plus = simplify(postimpact(1:NDof));
 
 
-% ------------------------- Dynamics Equations ----------------------------
-q_act = [q1; q2; q3; q4]; % Right arm, left arm, right leg, left leg angles actuated
+% Stance Dynamics
+fdyn = simplify([qdot; D\(J_st'*F_st_nu - C*qdot - G)]);
+gdyn = simplify([zeros(height(qdot), height(u)); D\(B + J_st'*F_st_u)]);
 
-% Flight dynamics (no contact)
-[D, C, G, B] = LagrangianDynamics(T, U, q, dq, q_act);   
+% Output Dynamics
 
-% =========================================================================
-% ------------------------- Virtual Constraints ---------------------------
-% =========================================================================
-
-% Define Symbolic Variables for virual constraint
-syms Kp Kd real
-syms u1 u2 u3 u4 real
-syms phid real
-syms qd1 qd2 qd3 qd4 real
-syms lambda_ra1 lambda_ra2 real
-syms lambda_la1 lambda_la2 real
-syms lambda_rl1 lambda_rl2 real
-syms lambda_ll1 lambda_ll2 real
-
-% Generalized input and contact force
-u_sym = [u1; u2; u3; u4];
-lambda_sym = [lambda_ra1; lambda_ra2; 
-              lambda_la1; lambda_la2;
-              lambda_rl1; lambda_rl2;
-              lambda_ll1; lambda_ll2];
-
-% Holonomic Virtual Constraint
-h = [q1 - qd1; % Drive the right arm to a desired angle
-     q2 - qd2; % Drive the left arm to a desired angle
-     q3 - qd3; % Drive the right leg to a desired angle
-     q4 - qd4]; % Drive the left leg to a desired angle
-
-% Holonomic Jacobian
-Jh = jacobian(h, q); %  Jh = dh/dq 
-Jh = simplify(Jh);
-
-Jhdotdq = jacobian(Jh * dq, q) * dq; % Jhdot * dq
-Jhdotdq = simplify(Jhdotdq);
-
-Jhdot = sym(zeros(size(Jh))); 
-for i = 1:size(Jh,1)
-    for j = 1:length(q)
-        Jhdot(i,:) = Jhdot(i,:) + diff(Jh(i,:), q(j)) * dq(j);
-    end
-end
-
-% First Derivative
-Lfh = Jh * dq; % dh/dt
-Lfh = simplify(Lfh);
-
-% Useful for Second Derivative (not computed symbolically as its too intense) 
-d2h__ = [jacobian(Jh*dq, q), Jh];
-
-% =========================================================================
-% --------------------------- Export Functions ----------------------------
-% =========================================================================
-
+%% Export functions
 if ~exist('./auto')
-    mkdir('./auto')
+    mkdir('./auto');
 end
-addpath('./auto')
+addpath('./auto');
+addpath('./animate');
+addpath('./dynamics');
+addpath('./events');
 
-% Generate position files
-matlabFunction(p_rhand, 'File', 'auto/auto_prhand');
-matlabFunction(p_lhand, 'File', 'auto/auto_plhand');
-matlabFunction(p_rfoot, 'File', 'auto/auto_prfoot');
-matlabFunction(p_lfoot, 'File', 'auto/auto_plfoot');
+matlabFunction(F_st, 'File', 'auto/F_st_auto', 'Vars', {s});
+matlabFunction(qdot_plus, 'File', 'auto/qdot_plus_auto', 'Vars', {s});
 
-% Generate Lagrangian Dynamics
-matlabFunction(D, 'File', 'auto/auto_D');
-matlabFunction(C, 'File', 'auto/auto_C');
-matlabFunction(G, 'File', 'auto/auto_G');
-matlabFunction(B, 'File', 'auto/auto_B');
+matlabFunction(p_st, 'File', 'auto/p_st_auto', 'Vars', {s});
+matlabFunction(p_sw, 'File', 'auto/p_sw_auto', 'Vars', {s});
 
-% Generate stationary Jacobians and their derivatives
-matlabFunction(Jst_rhand, 'File', 'auto/auto_Jst_rhand');
-matlabFunction(Jst_lhand, 'File', 'auto/auto_Jst_lhand');
-matlabFunction(Jst_rfoot, 'File', 'auto/auto_Jst_rfoot');
-matlabFunction(Jst_lfoot, 'File', 'auto/auto_Jst_lfoot');
+matlabFunction(p_com_L1, 'File', 'auto/p_com_L1_auto', 'Vars', {s});
+matlabFunction(p_com_L2, 'File', 'auto/p_com_L2_auto', 'Vars', {s});
+matlabFunction(p_com_A3, 'File', 'auto/p_com_A3_auto', 'Vars', {s});
+matlabFunction(p_com_A4, 'File', 'auto/p_com_A4_auto', 'Vars', {s});
+matlabFunction(p_com_T, 'File', 'auto/p_com_T_auto', 'Vars', {s});
 
-matlabFunction(Jstdot_rhand, 'File', 'auto/auto_Jstdot_rhand');
-matlabFunction(Jstdot_lhand, 'File', 'auto/auto_Jstdot_lhand');
-matlabFunction(Jstdot_rfoot, 'File', 'auto/auto_Jstdot_rfoot');
-matlabFunction(Jstdot_lfoot, 'File', 'auto/auto_Jstdot_lfoot');
+matlabFunction(p_L1, 'File', 'auto/p_L1_auto', 'Vars', {s});
+matlabFunction(p_L2, 'File', 'auto/p_L2_auto', 'Vars', {s});
+matlabFunction(p_A3, 'File', 'auto/p_A3_auto', 'Vars', {s});
+matlabFunction(p_A4, 'File', 'auto/p_A4_auto', 'Vars', {s});
 
-% Generate COM Jacobian and its derivative
-matlabFunction(JpCOM, 'File', 'auto/auto_JpCOM');
-matlabFunction(dJpCOM, 'File', 'auto/auto_dJpCOM');
-
-% Generate corresponding virtual constraints for stance
-matlabFunction(h, 'File', 'auto/auto_h');
-matlabFunction(Jh, 'File', 'auto/auto_Jh');
-matlabFunction(Jhdot, 'File', 'auto/auto_Jhdot');
-matlabFunction(Jhdotdq, 'File', 'auto/auto_Jhdotdq');
-matlabFunction(Lfh, 'File', 'auto/auto_Lfh');
-matlabFunction(d2h__, 'File', 'auto/auto_d2h__');
+matlabFunction(fdyn, 'File', 'auto/fdyn_auto', 'Vars', {s});
+matlabFunction(gdyn, 'File', 'auto/gdyn_auto', 'Vars', {s});
 
