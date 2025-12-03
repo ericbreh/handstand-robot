@@ -21,8 +21,8 @@ register(
 
 # --- CONFIGURATION ---
 CONTINUE_FROM_LATEST = False  # <--- CHANGED: Forces a fresh start
-TOTAL_TIMESTEPS = 10_000_000 
-SAVE_FREQ = 100_000         
+TOTAL_TIMESTEPS = 5_000_000 
+SAVE_FREQ = 100_0000         
 
 # --- CUSTOM CALLBACK TO SAVE MATCHED STATS ---
 class SaveMatchedStatsCallback(BaseCallback):
