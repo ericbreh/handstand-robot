@@ -6,7 +6,7 @@
 
     <default>
         <!-- Increased armature for stability with high torque -->
-        <joint armature="0.5" damping="1.0" limited="true"/>
+        <joint armature="0.02" damping="0.1" limited="true"/>
         <geom conaffinity="1" condim="3" friction="1.0 0.5 0.5" solimp="0.9 0.95 0.001" solref="0.02 1"/>
     </default>
 

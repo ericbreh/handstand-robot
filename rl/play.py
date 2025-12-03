@@ -10,25 +10,31 @@ import time
 register(
     id="FiveLinkCartwheel-v0",
     entry_point="envs.five_link_env:FiveLinkCartwheelEnv",
-    max_episode_steps=1000, 
+    max_episode_steps=1000,
 )
+
 
 def get_latest_run_dir(runs_dir="./runs"):
     """Finds the directory with the latest timestamp."""
     if not os.path.exists(runs_dir):
         print(f"Error: Directory '{runs_dir}' not found. Have you trained yet?")
         return None
-        
+
     # Get all subdirectories in runs/
-    all_runs = [os.path.join(runs_dir, d) for d in os.listdir(runs_dir) if os.path.isdir(os.path.join(runs_dir, d))]
-    
+    all_runs = [
+        os.path.join(runs_dir, d)
+        for d in os.listdir(runs_dir)
+        if os.path.isdir(os.path.join(runs_dir, d))
+    ]
+
     if not all_runs:
         print("Error: No run directories found.")
         return None
-        
+
     # Sort by creation time (latest last)
     latest_run = max(all_runs, key=os.path.getmtime)
     return latest_run
+
 
 def play_latest():
     latest_dir = get_latest_run_dir()
@@ -62,19 +68,21 @@ def play_latest():
             return
 
     if not os.path.exists(stats_path):
-        print("Error: vec_normalize.pkl not found. Cannot run model correctly without normalization stats.")
+        print(
+            "Error: vec_normalize.pkl not found. Cannot run model correctly without normalization stats."
+        )
         return
 
     # --- SETUP ENVIRONMENT ---
     env_id = "FiveLinkCartwheel-v0"
-    
+
     # We must wrap the env in DummyVecEnv because VecNormalize expects it
     env = DummyVecEnv([lambda: gym.make(env_id, render_mode="human")])
-    
+
     # Load the normalization statistics
     print(f"Loading normalization stats from {stats_path}...")
     env = VecNormalize.load(stats_path, env)
-    
+
     # IMPORTANT: Don't update stats or normalize rewards during test
     env.training = False
     env.norm_reward = False
@@ -86,21 +94,22 @@ def play_latest():
     # --- RUN LOOP ---
     print("\n--- Playing Model (Press Ctrl+C to stop) ---")
     obs = env.reset()
-    
+
     try:
         while True:
             # Deterministic=True generally performs better for testing
             action, _ = model.predict(obs, deterministic=True)
-            
+
             obs, reward, done, info = env.step(action)
-            
+            env.render()
             # Slow down slightly to make it watchable (MuJoCo is very fast)
-            time.sleep(1.0 / 40.0) 
+            # time.sleep(1.0 / 40.0)
 
     except KeyboardInterrupt:
         print("\nStopped by user.")
     finally:
         env.close()
+
 
 if __name__ == "__main__":
     play_latest()
