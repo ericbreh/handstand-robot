@@ -66,11 +66,7 @@ class FiveLinkCartwheelEnv(MujocoEnv):
             reward = 10.0 * abs(delta_angle)  # reward forward rotation
             reward = reward + 50.0 * abs(lateral_vel)
             
-            # After 1 second, reward angular momentum
-            if elapsed_time > 1.5:
-                # True angular momentum: L = I × ω (from MuJoCo)
-                roll_angular_momentum = self.data.subtree_angmom[0][0]  # X-axis (roll)
-                reward += 50.0 * abs(roll_angular_momentum)
+
         else:  # went backwards
             reward = -100.0 * abs(delta_angle)  # heavy penalty for going backwards
         
@@ -84,7 +80,10 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         if torso_z < 0.5:
             terminated = True
             if roll_angle > np.pi / 3:  # rotated significantly (~60 deg)
-                reward += 100.0  # reduced from 100
+                reward += 50.0  # reduced from 100
+                # True angular momentum: L = I × ω (from MuJoCo)
+                roll_angular_momentum = self.data.subtree_angmom[0][0]  # X-axis (roll)
+                reward += 100.0 * abs(roll_angular_momentum)
             else:  # fell without rotating - bad
                 reward -= 100.0  # reduced from 100
         
