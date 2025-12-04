@@ -16,7 +16,7 @@ from envs.five_link_env import FiveLinkCartwheelEnv
 register(
     id="FiveLinkCartwheel-v0",
     entry_point="envs.five_link_env:FiveLinkCartwheelEnv",
-    max_episode_steps=1000,
+    max_episode_steps=500,
 )
 
 # --- CONFIGURATION ---

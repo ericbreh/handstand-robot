@@ -24,9 +24,7 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         )
 
     def _get_obs(self):
-        obs_pos = (
-            self.data.qpos.flat.copy()
-        )  # <-- FIXED: Was skipping the first element (y-position)
+        obs_pos = self.data.qpos.flat.copy()
         velocity_data = self.data.qvel.flat.copy()
         sensor_data = self.data.sensordata.flat.copy()
         return np.concatenate([obs_pos, velocity_data, sensor_data]).astype(np.float64)
@@ -34,40 +32,64 @@ class FiveLinkCartwheelEnv(MujocoEnv):
     def step(self, action):
         self.do_simulation(action, self.frame_skip)
 
-        # --- EXTRACT INFO ---
-        torso_z = self.data.body("torso").xpos[2]
+        # --- Extract sensor and state data ---
+        torso_z_position = self.data.body("torso").xpos[2]
 
-        #  !! REWARD SHAPING !!
+        right_foot_contact = self.data.sensor("touch_right_foot").data[0] > 0
+        left_foot_contact = self.data.sensor("touch_left_foot").data[0] > 0
 
-        # Correctly identify forward and roll velocities
-        forward_velocity = self.data.qvel[
-            0
-        ]  # <-- FIXED: Was using qvel[1] (vertical) instead of qvel[0] (forward)
-        roll_velocity = self.data.qvel[2]
+        # --- Curriculum Task 1: Balance on the Right Leg (Corrected) ---
 
-        # A more robust reward for continuous cartwheeling
-        cartwheel_reward = (0.5 * forward_velocity) + (0.5 * abs(roll_velocity))
+        reward = 0.0  # Initialize to neutral
 
-        # Add a small penalty for every timestep to encourage action
-        alive_penalty = -0.1
-
-        # Add a small reward for taking large actions (encourages using motors)
-        action_reward = 0.01 * np.mean(np.abs(action))
-
-        reward = cartwheel_reward + alive_penalty + action_reward
-
-        # --- TERMINATION ---
-        terminated = False
-        # The agent fails if it falls over
-        if torso_z < 0.25:
-            terminated = True
-            reward = -10.0  # Give a flat, large penalty for falling.
+        # If goal achieved, give large positive reward
+        if right_foot_contact and not left_foot_contact:
+            reward = 2.0
+        # If left foot is on ground (either alone or with right), apply penalty
+        elif left_foot_contact:
+            reward = -1.5
+        #
+        # # Stability Penalty: Encourage smooth, minimal movement
+        # stability_cost = -0.01 * (
+        #     np.sum(np.square(self.data.qvel)) + np.sum(np.square(action))
+        # )
+        # reward += stability_cost # Add stability cost to the main reward
+        #
+        # --- Termination Conditions ---
+        # Terminate if the torso falls too low
+        terminated = torso_z_position < 0.7
+        if terminated:
+            reward = -20.0  # Heavy penalty for falling
 
         return self._get_obs(), reward, terminated, False, {}
 
-    def reset_model(self, seed=None):
-        qpos = self.init_qpos
-        qvel = self.init_qvel
+    def reset_model(self):
+        """
+        Resets the model to a randomly perturbed initial state.
+        This is crucial for training a robust policy.
+        """
+        # Define the magnitude of the random noise
+        pos_noise_magnitude = 0.02
+        vel_noise_magnitude = 0.1
 
-        self.set_state(qpos, qvel)
+        # Generate random noise centered around zero
+        # self.np_random is seeded by the parent's reset() method
+        qpos_noise = self.np_random.uniform(
+            low=-pos_noise_magnitude,
+            high=pos_noise_magnitude,
+            size=self.init_qpos.shape,
+        )
+        qvel_noise = self.np_random.uniform(
+            low=-vel_noise_magnitude,
+            high=vel_noise_magnitude,
+            size=self.init_qvel.shape,
+        )
+
+        # Combine initial state with noise
+        noisy_qpos = self.init_qpos + qpos_noise
+        noisy_qvel = self.init_qvel + qvel_noise
+
+        # Set the new, noisy initial state
+        self.set_state(noisy_qpos, noisy_qvel)
+
         return self._get_obs()

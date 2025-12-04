@@ -10,7 +10,7 @@ import time
 register(
     id="FiveLinkCartwheel-v0",
     entry_point="envs.five_link_env:FiveLinkCartwheelEnv",
-    max_episode_steps=1000,
+    max_episode_steps=500,
 )
 
 
@@ -101,6 +101,7 @@ def play_latest():
             action, _ = model.predict(obs, deterministic=True)
 
             obs, reward, done, info = env.step(action)
+            print(reward)
             env.render()
             # Slow down slightly to make it watchable (MuJoCo is very fast)
             # time.sleep(1.0 / 40.0)
