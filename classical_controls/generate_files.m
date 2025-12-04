@@ -58,7 +58,7 @@ s = [q; qdot];
 % Inputs
 u = [u1; u2; u3; u4];
 
-NDoF = length(q);
+NDof = length(q);
 
 % -------------------------- Forward kinematics ---------------------------
 % COM Positions
@@ -158,24 +158,32 @@ L = KE - PE;
 
 % ------------------------ Lagrangian Dynamics ----------------------------
 q_act = [q1; q2; q3; q4];
+
+tic;
 [D, C, G, B] = LagrangianDynamics(KE, PE, q, qdot, q_act);
+fprintf("Finished Lagrangian Dynamics in: " + toc + "secs\n");
 
 
 % ----------- Stance Jacobian and Stance Jacobian Derivative --------------
 % This is needed for dynamic equation with constraints
+tic;
 p_st = p_L1;
 
 J_st = jacobian(p_st, q);
 Jdot_st = simplify(jacobian(J_st*qdot, q));
 
-P = [D, -J_st'; J_st, zeros(height(J_st), height(J_st))];
-Q = [-C*qdot - G + B*u; -Jdot_st*qdot];
-constraint_dyn = P\Q;
+%%%% Lecture Note Method
+%P = [D, -J_st'; J_st, zeros(height(J_st), height(J_st))];
+%Q = [-C*qdot - G + B*u; -Jdot_st*qdot];
+%constraint_dyn = P\Q;
+%F_st = constraint_dyn(NDof+1:end);
 
-F_st = constraint_dyn(NDof+1:end);
+F_st = -pinv(J_st*(D\J_st'))*(J_st*(D\(-C*qdot - G + B*u)) + Jdot_st*qdot);
+F_st = simplify(F_st);
 
 F_st_u = simplify(jacobian(F_st, u));
 F_st_nu = simplify(F_st - F_st_u*u);
+fprintf("Finished Stance Forces in" + toc + "secs\n");
 
 % ----------- Impact Map ------------ %
 p_sw = p_L2;
@@ -186,11 +194,44 @@ J_sw = jacobian(p_sw, q);
 qdot_plus = simplify(postimpact(1:NDof));
 
 
-% Stance Dynamics
+% ----------------- Stance Dynamics -----------------
 fdyn = simplify([qdot; D\(J_st'*F_st_nu - C*qdot - G)]);
 gdyn = simplify([zeros(height(qdot), height(u)); D\(B + J_st'*F_st_u)]);
 
-% Output Dynamics
+% ------------------ Output Dynamics ----------------
+syms a0 a1 a2 a3 real
+syms b0 b1 b2 b3 real 
+syms c0 c1 c2 c3 real
+syms d0 d1 d2 d3 real
+syms th1_des
+
+a = [a0; a1; a2; a3];
+b = [b0; b1; b2; b3];
+c = [c0; c1; c2; c3];
+d = [d0; d1; d2; d3];
+
+% abs coords
+th1 = q1 + q5 - pi;
+th2 = q2 + q5 - pi;
+th3 = q3 + q5 - pi;
+th4 = q4 + q5 - pi; 
+th5 = q5;
+
+h5 = a0 + a1*th1 + a2*th1^2 + a3*th1^3; % for torso angle
+h4 = b0 + b1*th1 + b2*th1^2 + b3*th1^3; % for arm 4 angle
+h3 = c0 + c1*th1 + c2*th1^2 + c3*th1^3; % for arm 3 angle
+h2 = -th1 + (d0 + d1*th1 + d2*th1^2 + d3*th1^3)*(th1 + th1_des)*(th1 - th1_des);
+
+y = [th5 - h5;
+     th4 - h4;
+     th3 - h3;
+     th2 - h2];
+
+% Lie Derivatives
+Lfy = jacobian(y, s)*fdyn;
+L2fy = simplify(jacobian(Lfy, s)*fdyn);
+LgLfy = simplify(jacobian(Lfy, s)*gdyn);
+
 
 %% Export functions
 if ~exist('./auto')
@@ -221,3 +262,6 @@ matlabFunction(p_A4, 'File', 'auto/p_A4_auto', 'Vars', {s});
 matlabFunction(fdyn, 'File', 'auto/fdyn_auto', 'Vars', {s});
 matlabFunction(gdyn, 'File', 'auto/gdyn_auto', 'Vars', {s});
 
+matlabFunction(Lfy, 'File', 'auto/Lfy_auto', 'Vars', {s, a, b, c, d, th1_des});
+matlabFunction(L2fy, 'File', 'auto/L2fy_auto', 'Vars', {s, a, b, c, d, th1_des});
+matlabFunction(LgLfy, 'File', 'auto/LgLfy_auto', 'Vars', {s, a, b, c, d, th1_des});
