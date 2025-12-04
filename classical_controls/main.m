@@ -1,3 +1,9 @@
+clear; close all; clc;
+addpath('./auto');
+addpath('./animate');
+addpath('./dynamics');
+addpath('./events');
+addpath('./fmincon');
 
 %% Optimizer
 clear; close all; clc;
