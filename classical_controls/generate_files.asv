@@ -159,7 +159,7 @@ q_act = [q1; q2; q3; q4];
 
 tic;
 [D, C, G, B] = LagrangianDynamics(KE, PE, q, qdot, q_act);
-fprintf("Finished Lagrangian Dynamics in " + toc + " secs\n");
+fprintf("Finished Lagrangian Dynamics in: " + toc + "secs\n");
 
 
 % ----------- Stance Jacobian and Stance Jacobian Derivative --------------
