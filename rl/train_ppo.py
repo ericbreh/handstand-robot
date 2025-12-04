@@ -4,10 +4,12 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
+from stable_baselines3.common.noise import NormalActionNoise
 import os
 import datetime
 import time 
 import glob
+import numpy as np
 
 # Import the environment class
 from envs.five_link_env import FiveLinkCartwheelEnv
@@ -21,8 +23,8 @@ register(
 
 # --- CONFIGURATION ---
 CONTINUE_FROM_LATEST = False  # <--- CHANGED: Forces a fresh start
-TOTAL_TIMESTEPS = 10_000_000 
-SAVE_FREQ = 100_000         
+TOTAL_TIMESTEPS = 1_000_000 
+SAVE_FREQ = 25_000         
 
 # --- CUSTOM CALLBACK TO SAVE MATCHED STATS ---
 class SaveMatchedStatsCallback(BaseCallback):
@@ -88,19 +90,23 @@ def train_agent():
         print("Starting training from scratch (No previous run loaded).")
         vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=10.)
 
+    n_actions = vec_env.action_space.shape[-1]
+    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.3*np.ones(n_actions))
+
     if model is None:
         model = PPO(
             "MlpPolicy", 
             vec_env, 
+            # action_noise=action_noise,
             verbose=1, 
-            learning_rate=3e-4, 
-            n_steps=2048,
-            batch_size=64,
+            learning_rate=1e-3, 
+            n_steps=512,
+            batch_size=32,
             n_epochs=10,
-            gamma=0.99,
+            gamma=0.95,
             gae_lambda=0.95,
-            clip_range=0.2,
-            ent_coef=0.01, 
+            clip_range=0.3,
+            ent_coef=0.05,
             tensorboard_log=log_dir 
         )
 

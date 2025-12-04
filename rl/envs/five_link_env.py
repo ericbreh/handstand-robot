@@ -21,6 +21,9 @@ class FiveLinkCartwheelEnv(MujocoEnv):
             observation_space=observation_space,
             **kwargs,
         )
+        self._prev_roll_vel = 0.0
+        self._prev_roll_angle = 0.0
+        self._step_count = 0
 
     def _get_obs(self):
         obs_pos = self.data.qpos.flat[1:].copy() 
@@ -31,42 +34,65 @@ class FiveLinkCartwheelEnv(MujocoEnv):
     def step(self, action):
         self.do_simulation(action, self.frame_skip)
         
+        # --- EARLY NaN CHECK ---
+        # Check if simulation exploded before using any values
+        if not np.isfinite(self.data.qpos).all() or not np.isfinite(self.data.qvel).all():
+            obs = np.zeros(25, dtype=np.float64)
+            return obs, 0.0, True, False, {}
+        
         # --- EXTRACT INFO ---
         torso_z = self.data.body("torso").xpos[2] 
         rot_matrix = self.data.body("torso").xmat.reshape(3, 3)
         verticality = rot_matrix[2, 2] 
+        com_position = self.data.subtree_com[self.model.body("world").id]
 
-        # --- THE NUCLEAR REWARD FUNCTION ---
+        right_foot_pos = self.data.site("right_foot_site").xpos
+        left_foot_pos = self.data.site("left_foot_site").xpos
+
+        # Clip velocity to prevent explosion
+        roll_angle = self.data.qpos[2]
+        roll_vel = self.data.qvel[2]
+        lateral_vel = self.data.qvel[1]
         
-        # 1. Spin Reward (THE ONLY THING THAT MATTERS)
-        # We want it to rotate around the X-axis (Roll).
-        # We pay huge points for high angular velocity.
-        roll_velocity = self.data.qvel[2]
-        reward_spin = 10.0 * abs(roll_velocity)
-
-        # 2. Inversion Reward
-        # Still useful to tell it WHICH direction to spin (upside down is good)
-        reward_inverted = 5.0 * max(0.0, -1.0 * verticality)
-
-        # 3. Energy Cost (Keep it small so it doesn't discourage effort)
-        ctrl_cost = 1e-4 * np.sum(np.square(action))
-   
-        # 5. Handstand Bonus (Simplified)
-        # Just getting inverted is the goal for now.
-        reward_handstand = 0.0
-        if verticality < -0.5:
-            reward_handstand = 5.0
-
-        # Sum it up
-        reward = reward_spin + reward_inverted + reward_handstand - ctrl_cost
-
-        # --- TERMINATION ---
-        terminated = False
-        # Lower the death threshold so it can struggle on the floor a bit
-        if torso_z < 0.25: 
-            terminated = True
-            reward -= 10.0 # Small penalty. Failure is okay, inactivity is not.
+        # Track angular position change (want it to keep going in same direction)
+        delta_angle = roll_angle - self._prev_roll_angle
+        self._step_count += 1
+        
+        # Time elapsed: timestep (0.005) * frame_skip (5) * step_count
+        elapsed_time = 0.005 * 5 * self._step_count
+        
+        reward = 0.0
+        if delta_angle > 0:  # rotating in positive direction (forward progress)
+            reward = 10.0 * abs(delta_angle)  # reward forward rotation
+            reward = reward + 50.0 * abs(lateral_vel)
             
+            # After 1 second, reward angular momentum
+            if elapsed_time > 1:
+                # True angular momentum: L = I × ω (from MuJoCo)
+                roll_angular_momentum = self.data.subtree_angmom[0][0]  # X-axis (roll)
+                reward += 5.0 * abs(roll_angular_momentum)
+        else:  # went backwards
+            reward = -100.0 * abs(delta_angle)  # heavy penalty for going backwards
+        
+        self._prev_roll_angle = roll_angle
+
+        terminated = False
+        
+        # Termination conditions with reward/penalty based on rotation
+        # roll_angle = abs(self.data.qpos[2])  # how much it has rotated
+        
+        if torso_z < 0.5:
+            terminated = True
+            if roll_angle > np.pi / 3:  # rotated significantly (~60 deg)
+                reward += 100.0  # reduced from 100
+            else:  # fell without rotating - bad
+                reward -= 100.0  # reduced from 100
+        
+        # Safety: flying away
+        if torso_z > 5.0:
+            terminated = True
+        
+        # Final safety clip on reward
         if self.render_mode == "human":
             self.render()
 
@@ -77,22 +103,15 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         noise_high = 0.05
         qpos = self.init_qpos + self.np_random.uniform(low=noise_low, high=noise_high, size=self.model.nq)
         qvel = self.init_qvel + self.np_random.uniform(low=noise_low, high=noise_high, size=self.model.nv)
+
+        # qpos = self.init_qpos
+        # qvel = self.init_qvel
         
-        # --- THE FIX: RANDOMIZED START ---
-        # 50% chance to spawn in a "Pre-Cartwheel" state
-        if self.np_random.random() > 0.5:
-            # Tilt sideways (0.3 rad)
-            qpos[2] = 0.3 
-            # Give it a shove (Velocity)
-            qvel[0] = 1.5 # Moving left
-            qvel[2] = 2.0 # Spinning left
-            # Lift the leg (q3 is index 5)
-            qpos[5] = 0.8 
-        else:
-            # Standard start
-            qpos[0] = 0.0 
-            qpos[1] = 0.0 
-            qpos[2] = 0.0 
+        qpos[3] = 2.7
+        qpos[4] = 2.7
 
         self.set_state(qpos, qvel)
+        self._prev_roll_vel = 0.0
+        self._prev_roll_angle = 0.0
+        self._step_count = 0  # reset tracking
         return self._get_obs()
