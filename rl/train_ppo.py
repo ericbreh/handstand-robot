@@ -7,7 +7,7 @@ from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
 from stable_baselines3.common.noise import NormalActionNoise
 import os
 import datetime
-import time 
+import time
 import glob
 import numpy as np
 
@@ -18,20 +18,22 @@ from envs.five_link_env import FiveLinkCartwheelEnv
 register(
     id="FiveLinkCartwheel-v0",
     entry_point="envs.five_link_env:FiveLinkCartwheelEnv",
-    max_episode_steps=400, 
+    max_episode_steps=400,
 )
 
 # --- CONFIGURATION ---
 CONTINUE_FROM_LATEST = False  # <--- CHANGED: Forces a fresh start
-TOTAL_TIMESTEPS = 1_000_000 
-SAVE_FREQ = 25_000         
+TOTAL_TIMESTEPS = 1_000_000
+SAVE_FREQ = 12_500
+
 
 # --- CUSTOM CALLBACK TO SAVE MATCHED STATS ---
 class SaveMatchedStatsCallback(BaseCallback):
     """
-    Saves the VecNormalize stats with the EXACT same naming convention 
+    Saves the VecNormalize stats with the EXACT same naming convention
     and frequency as the CheckpointCallback.
     """
+
     def __init__(self, save_path, save_freq, verbose=1):
         super().__init__(verbose)
         self.save_path = save_path
@@ -42,64 +44,74 @@ class SaveMatchedStatsCallback(BaseCallback):
             # 1. Save "Latest" (for quick resuming/playing)
             latest_path = os.path.join(self.save_path, "vec_normalize.pkl")
             self.training_env.save(latest_path)
-            
+
             # 2. Save "Versioned" to match the checkpoint exactly
             ckpt_dir = os.path.join(self.save_path, "checkpoints")
             os.makedirs(ckpt_dir, exist_ok=True)
-            
-            versioned_filename = f"vec_normalize_{self.n_calls*4.0}_steps.pkl"
+
+            versioned_filename = f"vec_normalize_{self.n_calls*8.0}_steps.pkl"
             versioned_path = os.path.join(ckpt_dir, versioned_filename)
-            
+
             self.training_env.save(versioned_path)
-            
+
             if self.verbose > 0:
                 print(f"Synced Save: {versioned_filename}")
         return True
 
+
 def get_previous_run(runs_dir="./runs", current_run_name=None):
-    if not os.path.exists(runs_dir): return None
-    all_runs = [os.path.join(runs_dir, d) for d in os.listdir(runs_dir) if os.path.isdir(os.path.join(runs_dir, d))]
+    if not os.path.exists(runs_dir):
+        return None
+    all_runs = [
+        os.path.join(runs_dir, d)
+        for d in os.listdir(runs_dir)
+        if os.path.isdir(os.path.join(runs_dir, d))
+    ]
     valid_runs = [r for r in all_runs if current_run_name not in r]
-    if not valid_runs: return None
+    if not valid_runs:
+        return None
     return max(valid_runs, key=os.path.getmtime)
+
 
 def train_agent():
     run_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     run_name = f"PPO_Cartwheel_{run_id}"
     base_dir = f"./runs/{run_name}"
-    
+
     log_dir = os.path.join(base_dir, "logs")
     models_dir = os.path.join(base_dir, "checkpoints")
-    
+
     os.makedirs(log_dir, exist_ok=True)
     os.makedirs(models_dir, exist_ok=True)
 
     print(f"--- STARTING NEW RUN: {run_name} ---")
 
     env_id = "FiveLinkCartwheel-v0"
-    vec_env = make_vec_env(env_id, n_envs=4, seed=0, vec_env_cls=DummyVecEnv)
+    vec_env = make_vec_env(env_id, n_envs=8, seed=0, vec_env_cls=DummyVecEnv)
 
     model = None
     previous_run = get_previous_run(current_run_name=run_name)
-    
+
     if CONTINUE_FROM_LATEST and previous_run:
         print(f"--- FOUND PREVIOUS RUN: {previous_run} ---")
         # (Resume logic skipped since CONTINUE is False)
     else:
         # Start Fresh: Create new normalization wrapper
         print("Starting training from scratch (No previous run loaded).")
-        vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=10.)
+        vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
 
     n_actions = vec_env.action_space.shape[-1]
-    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.3*np.ones(n_actions))
+    action_noise = NormalActionNoise(
+        mean=np.zeros(n_actions), sigma=0.3 * np.ones(n_actions)
+    )
 
     if model is None:
         model = PPO(
-            "MlpPolicy", 
-            vec_env, 
+            "MlpPolicy",
+            vec_env,
             # action_noise=action_noise,
-            verbose=1, 
-            learning_rate=1e-3, 
+            verbose=1,
+            learning_rate=1e-3,
             n_steps=512,
             batch_size=32,
             n_epochs=10,
@@ -107,23 +119,25 @@ def train_agent():
             gae_lambda=0.95,
             clip_range=0.3,
             ent_coef=0.05,
-            tensorboard_log=log_dir 
+            tensorboard_log=log_dir,
         )
 
     print(f"Training for {TOTAL_TIMESTEPS/1e6:.1f}M steps...")
     print(f"Saving synced checkpoints every {SAVE_FREQ} steps.")
-    
+
     callbacks = [
-        CheckpointCallback(save_freq=SAVE_FREQ, save_path=models_dir, name_prefix="ckpt"),
-        SaveMatchedStatsCallback(save_path=base_dir, save_freq=SAVE_FREQ) 
+        CheckpointCallback(
+            save_freq=SAVE_FREQ, save_path=models_dir, name_prefix="ckpt"
+        ),
+        SaveMatchedStatsCallback(save_path=base_dir, save_freq=SAVE_FREQ),
     ]
 
     try:
         model.learn(
-            total_timesteps=TOTAL_TIMESTEPS, 
-            tb_log_name="PPO", 
-            callback=callbacks, 
-            reset_num_timesteps=False 
+            total_timesteps=TOTAL_TIMESTEPS,
+            tb_log_name="PPO",
+            callback=callbacks,
+            reset_num_timesteps=False,
         )
     except KeyboardInterrupt:
         print("\nTraining interrupted.")
@@ -134,6 +148,7 @@ def train_agent():
         vec_env.save(stats_path)
         print(f"Saved final model and stats to {base_dir}")
         vec_env.close()
+
 
 if __name__ == "__main__":
     train_agent()
