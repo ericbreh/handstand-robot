@@ -76,7 +76,7 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         # arms_up_reward = max(0.0, arms_up_reward)
         # info["arms_up_reward"] = arms_up_reward
         # reward += arms_up_reward
-        #
+
         # # LEGS STRAIGHT REWARD
         # right_hip_angle = self.data.qpos[5]
         # left_hip_angle = self.data.qpos[6]
@@ -93,82 +93,80 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         # legs_straight_reward = max(0.0, legs_straight_reward)
         # info["legs_straight_reward"] = legs_straight_reward
         # reward += legs_straight_reward
-        #
-        # # HAND CONTACT REWARD
-        # left_hand_on_ground = False
-        # right_hand_on_ground = False
-        #
-        # ground_geom_id = self.model.geom("ground").id
-        # left_arm_geom_id = self.model.geom("left_arm_geom").id
-        # right_arm_geom_id = self.model.geom("right_arm_geom").id
-        #
-        # for i in range(self.data.ncon):
-        #     contact = self.data.contact[i]
-        #     # Check for left hand contact with ground
-        #     if (
-        #         contact.geom1 == left_arm_geom_id and contact.geom2 == ground_geom_id
-        #     ) or (
-        #         contact.geom1 == ground_geom_id and contact.geom2 == left_arm_geom_id
-        #     ):
-        #         left_hand_on_ground = True
-        #     # Check for right hand contact with ground
-        #     if (
-        #         contact.geom1 == right_arm_geom_id and contact.geom2 == ground_geom_id
-        #     ) or (
-        #         contact.geom1 == ground_geom_id and contact.geom2 == right_arm_geom_id
-        #     ):
-        #         right_hand_on_ground = True
-        #
-        # hand_contact_reward = 0.0
+
+        # HAND CONTACT REWARD
+        left_hand_on_ground = False
+        right_hand_on_ground = False
+
+        ground_geom_id = self.model.geom("ground").id
+        left_arm_geom_id = self.model.geom("left_arm_geom").id
+        right_arm_geom_id = self.model.geom("right_arm_geom").id
+
+        for i in range(self.data.ncon):
+            contact = self.data.contact[i]
+            # Check for left hand contact with ground
+            if (
+                contact.geom1 == left_arm_geom_id and contact.geom2 == ground_geom_id
+            ) or (
+                contact.geom1 == ground_geom_id and contact.geom2 == left_arm_geom_id
+            ):
+                left_hand_on_ground = True
+            # Check for right hand contact with ground
+            if (
+                contact.geom1 == right_arm_geom_id and contact.geom2 == ground_geom_id
+            ) or (
+                contact.geom1 == ground_geom_id and contact.geom2 == right_arm_geom_id
+            ):
+                right_hand_on_ground = True
+
+        hand_contact_reward = 0.0
         # if left_hand_on_ground:
         #     hand_contact_reward += 20.0
         # if right_hand_on_ground:
         #     hand_contact_reward += 20.0
-        #
-        # if left_hand_on_ground and right_hand_on_ground:
-        #     hand_contact_reward += 200.0  # Large bonus reward
-        #
-        # info["hand_contact_reward"] = hand_contact_reward
-        # reward += hand_contact_reward
 
-        # INVERSION REWARD
-        inversion_reward = 100.0 * (1.0 - (verticality + 1.0) ** 0.5)
-        info["inversion_reward"] = inversion_reward
-        reward += inversion_reward
+        if left_hand_on_ground and right_hand_on_ground:
+            hand_contact_reward += 50.0
 
-        # # LEG CONTACT PENALTY
-        # left_foot_on_ground = False
-        # right_foot_on_ground = False
-        #
-        # ground_geom_id = self.model.geom("ground").id
-        # left_leg_geom_id = self.model.geom("left_leg_geom").id
-        # right_leg_geom_id = self.model.geom("right_leg_geom").id
-        #
-        # for i in range(self.data.ncon):
-        #     contact = self.data.contact[i]
-        #     # Check for left foot contact with ground
-        #     if (
-        #         contact.geom1 == left_leg_geom_id and contact.geom2 == ground_geom_id
-        #     ) or (
-        #         contact.geom1 == ground_geom_id and contact.geom2 == left_leg_geom_id
-        #     ):
-        #         left_foot_on_ground = True
-        #     # Check for right foot contact with ground
-        #     if (
-        #         contact.geom1 == right_leg_geom_id and contact.geom2 == ground_geom_id
-        #     ) or (
-        #         contact.geom1 == ground_geom_id and contact.geom2 == right_leg_geom_id
-        #     ):
-        #         right_foot_on_ground = True
-        #
-        # leg_contact_penalty = 0.0
+        info["hand_contact_reward"] = hand_contact_reward
+        reward += hand_contact_reward
+
+        # LEG CONTACT PENALTY
+        left_foot_on_ground = False
+        right_foot_on_ground = False
+
+        ground_geom_id = self.model.geom("ground").id
+        left_leg_geom_id = self.model.geom("left_leg_geom").id
+        right_leg_geom_id = self.model.geom("right_leg_geom").id
+
+        for i in range(self.data.ncon):
+            contact = self.data.contact[i]
+            # Check for left foot contact with ground
+            if (
+                contact.geom1 == left_leg_geom_id and contact.geom2 == ground_geom_id
+            ) or (
+                contact.geom1 == ground_geom_id and contact.geom2 == left_leg_geom_id
+            ):
+                left_foot_on_ground = True
+            # Check for right foot contact with ground
+            if (
+                contact.geom1 == right_leg_geom_id and contact.geom2 == ground_geom_id
+            ) or (
+                contact.geom1 == ground_geom_id and contact.geom2 == right_leg_geom_id
+            ):
+                right_foot_on_ground = True
+
+        leg_contact_penalty = 0.0
         # if left_foot_on_ground:
         #     leg_contact_penalty -= 50.0
         # if right_foot_on_ground:
         #     leg_contact_penalty -= 50.0
-        # info["leg_contact_penalty"] = leg_contact_penalty
-        # reward += leg_contact_penalty
-        #
+
+        if (not left_foot_on_ground) and (not right_foot_on_ground):
+            leg_contact_penalty += 50
+        info["leg_contact_penalty"] = leg_contact_penalty
+        reward += leg_contact_penalty
+
         # # ONE HAND ONE FOOT PENALTY
         # one_hand_one_foot_penalty = 0.0
         # if (
@@ -180,6 +178,11 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         #     one_hand_one_foot_penalty = -50.0
         # info["one_hand_one_foot_penalty"] = one_hand_one_foot_penalty
         # reward += one_hand_one_foot_penalty
+
+        # INVERSION REWARD
+        inversion_reward = 100.0 * (1.0 - np.sqrt(np.maximum(verticality + 1.0, 0.0)))
+        info["inversion_reward"] = inversion_reward
+        reward += inversion_reward
 
         terminated = False
         if (
