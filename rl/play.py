@@ -112,42 +112,14 @@ def play_latest(checkpoint_path=None):
             # Access underlying MuJoCo env through the wrappers
             base_env = env.venv.envs[0].unwrapped
 
-
             obs, reward, done, info = env.step(action)
-            # --- DEBUG INFO ---
-            rot_matrix = base_env.data.body("torso").xmat.reshape(3, 3)
-            verticality = rot_matrix[2, 2]
-
-            left_hand_contact = base_env.data.sensordata[8]
-            right_hand_contact = base_env.data.sensordata[9]
-            left_foot_contact = base_env.data.sensordata[10]
-            right_foot_contact = base_env.data.sensordata[11]
-
-            # qpos layout from robot_model.xml:
-            # 0: root_y (y-position)
-            # 1: root_z (z-position)
-            # 2: root_roll (rotation)
-            # 3: joint_q1 (right arm)
-            # 4: joint_q2 (left arm)
-            # 5: joint_q3 (right leg)
-            # 6: joint_q4 (left leg)
-
-            roll_angle = base_env.data.qpos[2]
-            right_arm_qpos = base_env.data.qpos[3]
-            left_arm_qpos = base_env.data.qpos[4]
-            right_leg_qpos = base_env.data.qpos[5]
-            left_leg_qpos = base_env.data.qpos[6]
-
-
-            print("---")
             print(f"Reward: {reward[0]:.3f}")
-            # print(f"Action: {action[0]}")
-            print(f"Torso Verticality: {verticality:.3f}")
-            print(f"Contacts: L_Hand={left_hand_contact:.3f}, R_Hand={right_hand_contact:.3f}, L_Foot={left_foot_contact:.3f}, R_Foot={right_foot_contact:.3f}")
-            print(f"Joints: R_Arm={right_arm_qpos:.3f}, L_Arm={left_arm_qpos:.3f}, R_Leg={right_leg_qpos:.3f}, L_Leg={left_leg_qpos:.3f}")
-            print(f"Roll Angle: {roll_angle:.3f}")
+            if info[0]:
+                print("Reward Components:")
+                for key, value in info[0].items():
+                    if isinstance(value, float):
+                        print(f"  {key}: {value:.3f}")
 
-            # Slow down slightly to make it watchable (MuJoCo is very fast)
             time.sleep(1.0 / 40.0)
 
     except KeyboardInterrupt:
@@ -157,8 +129,15 @@ def play_latest(checkpoint_path=None):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Play a trained PPO agent for the FiveLinkCartwheel environment.")
-    parser.add_argument("-c", "--checkpoint", type=str, help="Path to a specific checkpoint file to play.")
+    parser = argparse.ArgumentParser(
+        description="Play a trained PPO agent for the FiveLinkCartwheel environment."
+    )
+    parser.add_argument(
+        "-c",
+        "--checkpoint",
+        type=str,
+        help="Path to a specific checkpoint file to play.",
+    )
     args = parser.parse_args()
 
     play_latest(checkpoint_path=args.checkpoint)
