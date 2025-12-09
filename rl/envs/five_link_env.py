@@ -120,10 +120,10 @@ class FiveLinkCartwheelEnv(MujocoEnv):
                 right_hand_on_ground = True
 
         hand_contact_reward = 0.0
-        # if left_hand_on_ground:
-        #     hand_contact_reward += 20.0
-        # if right_hand_on_ground:
-        #     hand_contact_reward += 20.0
+        if left_hand_on_ground:
+            hand_contact_reward += 20.0
+        if right_hand_on_ground:
+            hand_contact_reward += 20.0
 
         if left_hand_on_ground and right_hand_on_ground:
             hand_contact_reward += 50.0
@@ -162,22 +162,22 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         # if right_foot_on_ground:
         #     leg_contact_penalty -= 50.0
 
-        if (not left_foot_on_ground) and (not right_foot_on_ground):
-            leg_contact_penalty += 50
-        info["leg_contact_penalty"] = leg_contact_penalty
-        reward += leg_contact_penalty
+        # if (not left_foot_on_ground) and (not right_foot_on_ground):
+        #     leg_contact_penalty += 50
+        # info["leg_contact_penalty"] = leg_contact_penalty
+        # reward += leg_contact_penalty
 
-        # # ONE HAND ONE FOOT PENALTY
-        # one_hand_one_foot_penalty = 0.0
-        # if (
-        #     (left_hand_on_ground or right_hand_on_ground)
-        #     and (left_foot_on_ground or right_foot_on_ground)
-        #     and not (left_hand_on_ground and right_hand_on_ground)
-        #     and not (left_foot_on_ground and right_foot_on_ground)
-        # ):
-        #     one_hand_one_foot_penalty = -50.0
-        # info["one_hand_one_foot_penalty"] = one_hand_one_foot_penalty
-        # reward += one_hand_one_foot_penalty
+        # ONE HAND ONE FOOT PENALTY
+        one_hand_one_foot_penalty = 0.0
+        if (
+            (left_hand_on_ground or right_hand_on_ground)
+            and (left_foot_on_ground or right_foot_on_ground)
+            and not (left_hand_on_ground and right_hand_on_ground)
+            and not (left_foot_on_ground and right_foot_on_ground)
+        ):
+            one_hand_one_foot_penalty = -50.0
+        info["one_hand_one_foot_penalty"] = one_hand_one_foot_penalty
+        reward += one_hand_one_foot_penalty
 
         # INVERSION REWARD
         inversion_reward = 100.0 * (1.0 - np.sqrt(np.maximum(verticality + 1.0, 0.0)))
