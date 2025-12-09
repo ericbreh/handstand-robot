@@ -50,13 +50,13 @@ class FiveLinkCartwheelEnv(MujocoEnv):
         rot_matrix = self.data.body("torso").xmat.reshape(3, 3)
         verticality = rot_matrix[2, 2]
 
-        com_position = self.data.subtree_com[self.model.body("world").id]
-
-        left_hand_contact = self.data.sensordata[8]
-        right_hand_contact = self.data.sensordata[9]
-        left_foot_contact = self.data.sensordata[10]
-        right_foot_contact = self.data.sensordata[11]
-
+        # com_position = self.data.subtree_com[self.model.body("world").id]
+        #
+        # left_hand_contact = self.data.sensordata[8]
+        # right_hand_contact = self.data.sensordata[9]
+        # left_foot_contact = self.data.sensordata[10]
+        # right_foot_contact = self.data.sensordata[11]
+        #
         reward = 0.0
 
         # # ARMS UP REWARD
@@ -156,7 +156,7 @@ class FiveLinkCartwheelEnv(MujocoEnv):
             ):
                 right_foot_on_ground = True
 
-        leg_contact_penalty = 0.0
+        # leg_contact_penalty = 0.0
         # if left_foot_on_ground:
         #     leg_contact_penalty -= 50.0
         # if right_foot_on_ground:
@@ -178,6 +178,15 @@ class FiveLinkCartwheelEnv(MujocoEnv):
             one_hand_one_foot_penalty = -50.0
         info["one_hand_one_foot_penalty"] = one_hand_one_foot_penalty
         reward += one_hand_one_foot_penalty
+
+        # SUSTAINED BALANCE REWARD
+        sustained_balance_reward = 0.0
+        if (left_hand_on_ground and right_hand_on_ground) and (
+            not left_foot_on_ground and not right_foot_on_ground
+        ):
+            sustained_balance_reward = 10.0
+        info["sustained_balance_reward"] = sustained_balance_reward
+        reward += sustained_balance_reward
 
         # INVERSION REWARD
         inversion_reward = 100.0 * (1.0 - np.sqrt(np.maximum(verticality + 1.0, 0.0)))
