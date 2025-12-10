@@ -115,11 +115,12 @@ def train_agent():
             n_steps=512,
             batch_size=32,
             n_epochs=10,
-            gamma=0.95,
+            gamma=0.99,
             gae_lambda=0.95,
             clip_range=0.3,
             ent_coef=0.05,
             tensorboard_log=log_dir,
+            seed=0,
         )
 
     print(f"Training for {TOTAL_TIMESTEPS/1e6:.1f}M steps...")
