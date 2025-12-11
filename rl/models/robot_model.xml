@@ -67,12 +67,11 @@
     </worldbody>
 
     <actuator>
-        <!-- BOOSTED TORQUE: 500 for arms, 1000 for legs -->
-        <!-- This ensures it has enough power to kick off the ground explosively -->
-        <motor name="m_q1" joint="joint_q1" ctrlrange="-500 500"/>
-        <motor name="m_q2" joint="joint_q2" ctrlrange="-500 500"/>
-        <motor name="m_q3" joint="joint_q3" ctrlrange="-1000 1000"/>
-        <motor name="m_q4" joint="joint_q4" ctrlrange="-1000 1000"/>
+        <!-- Reduced torque to manageable levels for learning -->
+        <motor name="m_q1" joint="joint_q1" ctrlrange="-150 150"/>
+        <motor name="m_q2" joint="joint_q2" ctrlrange="-150 150"/>
+        <motor name="m_q3" joint="joint_q3" ctrlrange="-150 150"/>
+        <motor name="m_q4" joint="joint_q4" ctrlrange="-150 150"/>
     </actuator>
 
     <sensor>
