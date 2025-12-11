@@ -18,7 +18,6 @@ def visualize_model():
 
     try:
         # Load the model and data
-        # This is the most direct way to check if the XML is valid
         model = mujoco.MjModel.from_xml_path(MODEL_PATH)
         data = mujoco.MjData(model)
         

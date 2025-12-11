@@ -1,19 +1,11 @@
 <mujoco model="FiveLinkHumanoid">
 
     <compiler angle="degree" inertiafromgeom="true" meshdir="assets"/>
-    <option integrator="implicitfast" timestep="0.002"/>  <!-- Changed integration from RK4 to implictfast -->
-
-    <!-- <default>
-        <joint armature="0.25" damping="60.0" limited="true"/>
-        <geom conaffinity="1" condim="3" friction="4.0 0.05 0.005" solimp=".99 .99 .001" solref="0.004 1" margin="0.001"/>
-        
-        <position kp="2000" forcerange="-3000 3000"/>
-    </default> -->
-
+    <option integrator="implicitfast" timestep="0.002"/> 
+    
     <default>
         <joint armature="0.2" damping="20.0" limited="true"/>
         <geom conaffinity="1" condim="3" friction="0.8 0.05 0.005" solimp=".99 .99 .001" solref="0.02 1" margin="0.001"/>
-        <!-- CHange the solref from 0.004 to 0.02  and damping from 20 to 60 -->
         <position kp="1000" forcerange="-1500 1500"/>
     </default>
 

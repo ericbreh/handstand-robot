@@ -8,13 +8,13 @@ class HandstandEnv(gym.Env):
     def __init__(self, render_mode=None):
         super().__init__()
         
-        # 1. Load Model
+        # Load Model
         current_dir = os.path.dirname(os.path.abspath(__file__))
         xml_path = os.path.join(current_dir, "../models/recorder_model.xml")
         self.model = mujoco.MjModel.from_xml_path(xml_path)
         self.data = mujoco.MjData(self.model)
         
-        # 2. Load Expert Trajectory
+        # Load Expert Trajectory
         traj_path = os.path.join(current_dir, "../expert_trajectory_full.npy")
         if not os.path.exists(traj_path):
             raise FileNotFoundError("Run interpolate_trajectory.py first!")
@@ -26,21 +26,18 @@ class HandstandEnv(gym.Env):
         self.trajectory_dt = self.expert_data.get("dt", 0.002)
         self.max_steps = len(self.expert_qpos)
         
-        # --- NEW: Cache the Ground ID (Safe Version) ---
-        # Checks for "ground" first, then "floor" to avoid the "-1" bug
+        # Cache the Ground ID to distinguish floor contacts from self-collisions
         self.ground_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "ground")
         if self.ground_id == -1:
              self.ground_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "floor")
 
-        # 3. Action Space
+        # Define Action Space
         n_actions = self.model.nu
         self.action_space = spaces.Box(low=-1, high=1, shape=(n_actions,), dtype=np.float32)
-        
-        # Cache Limits
         self.ctrl_ranges = self.model.actuator_ctrlrange.copy()
         
-        # 4. Observation Space
-        # We need: [Current State] + [Target State] + [Phase] + [LAST ACTION]
+        # Define Observation Space
+        # Structure: [Current State, Current Vel, Target State, Target Vel, Phase, Last Action]
         obs_dim = (self.model.nq * 2) + (self.model.nv * 2) + 1 + n_actions
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
         
@@ -48,16 +45,16 @@ class HandstandEnv(gym.Env):
         self.viewer = None
         self.current_step_idx = 0
         
-        # Jitter Fix: Memory of previous action
+        # Track previous action for smoothness calculations
         self.last_action = np.zeros(n_actions, dtype=np.float32)
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         
-        # Reset Action Memory
+        # Reset internal state
         self.last_action = np.zeros(self.model.nu, dtype=np.float32)
 
-        # RSI (Random Start)
+        # Reference State Initialization (RSI)
         if np.random.rand() < 0.5:
             start_idx = 0
         else:
@@ -66,11 +63,11 @@ class HandstandEnv(gym.Env):
 
         self.current_step_idx = start_idx
         
-        # Init State
+        # Initialize robot state
         init_qpos = self.expert_qpos[start_idx].copy()
         init_qvel = self.expert_qvel[start_idx].copy()
         
-        # Tiny noise
+        # Add small noise to initial state
         noise_pos = np.random.normal(0, 0.001, size=self.model.nq)
         if noise_pos[1] < 0: noise_pos[1] = 0 
         init_qpos += noise_pos
@@ -84,30 +81,28 @@ class HandstandEnv(gym.Env):
         return self._get_obs(), {}
 
     def step(self, action):
-        # 1. Action Scaling
+        # Scale actions to control range
         low = self.ctrl_ranges[:, 0]
         high = self.ctrl_ranges[:, 1]
         scaled_action = low + (action + 1) * 0.5 * (high - low)
         self.data.ctrl[:] = scaled_action
         
-        # 2. Step Physics
+        # Step simulation
         for _ in range(4):
             mujoco.mj_step(self.model, self.data)
             
         self.current_step_idx += 1
 
-        # --- NEW: SELF-COLLISION DETECTION ---
-        # Calculate how many contacts are NOT with the floor
+        # Detect self-collisions (contacts not involving the ground)
         self_collision_count = 0
         for i in range(self.data.ncon):
             contact = self.data.contact[i]
             geom1 = contact.geom1
             geom2 = contact.geom2
-            # If neither geom is the ground, it's a self-collision
             if geom1 != self.ground_id and geom2 != self.ground_id:
                 self_collision_count += 1
         
-        # 3. Get Expert Target
+        # Retrieve expert target state
         current_time = self.data.time
         target_idx = int(current_time / self.trajectory_dt)
         target_idx = min(target_idx, self.max_steps - 1)
@@ -115,9 +110,9 @@ class HandstandEnv(gym.Env):
         target_qpos = self.expert_qpos[target_idx]
         target_qvel = self.expert_qvel[target_idx]
         
-        # 4. REWARD CALCULATION
+        # Calculate Rewards
         
-        # A. Pose & Root Errors
+        # Pose & Root Tracking
         joint_diff = self.data.qpos[2:] - target_qpos[2:]
         joint_err = np.sum(joint_diff**2)
         
@@ -126,7 +121,7 @@ class HandstandEnv(gym.Env):
         
         vel_err = np.sum((self.data.qvel - target_qvel)**2)
         
-        # Weights
+        # Reward Weights
         w_pose   = 0.60
         w_root   = 0.25
         w_vel    = 0.10
@@ -134,12 +129,11 @@ class HandstandEnv(gym.Env):
         w_smooth = 0.05
         w_coll   = 0.10  
         
-        # Rewards
         r_pose = np.exp(-2.0 * joint_err)
         r_root = np.exp(-5.0 * root_err)
         r_vel  = np.exp(-0.1 * vel_err)
         
-        # B. JITTER & COLLISION PENALTIES
+        # Penalties (Control, Smoothness, Collision)
         control_penalty = np.sum(np.square(action)) 
         
         action_diff = action - self.last_action
@@ -147,26 +141,26 @@ class HandstandEnv(gym.Env):
         
         collision_penalty = self_collision_count * w_coll
         
-        # Combine
+        # Combine terms
         base_reward = (w_pose * r_pose) + (w_root * r_root) + (w_vel * r_vel)
         penalty_cost = (w_energy * control_penalty) + (w_smooth * smoothness_penalty) + collision_penalty
         
         reward = base_reward - penalty_cost
         
-        # Update last action for next step
+        # Update last action
         self.last_action = action.copy()
         
-        # 5. TERMINATION
+        # Check termination conditions
         terminated = False
         if target_idx >= self.max_steps - 10:
             terminated = True
             
-        # Early Stop Checks
+        # Early stopping for failure states
         if joint_err > 20.0: terminated = True; reward = 0
         if self.data.qpos[1] < (target_qpos[1] - 0.35): terminated = True; reward = 0
         if abs(self.data.qpos[0] - target_qpos[0]) > 1.0: terminated = True; reward = 0
         
-        # Collision Termination (If robot is tangled)
+        # Terminate on excessive self-collision
         if self_collision_count > 5:
             terminated = True
             reward = -1.0
@@ -174,7 +168,7 @@ class HandstandEnv(gym.Env):
         return self._get_obs(), reward, terminated, False, {}
 
     def _get_obs(self):
-        # We need to find the target again for the observation
+        # Retrieve target state for observation
         current_time = self.data.time
         target_idx = int(current_time / self.trajectory_dt)
         target_idx = min(target_idx, self.max_steps - 1)
@@ -184,14 +178,13 @@ class HandstandEnv(gym.Env):
         
         phase = np.array([self.current_step_idx / self.max_steps])
         
-        # Flatten everything including self.last_action
         return np.concatenate([
             self.data.qpos, 
             self.data.qvel, 
             target_qpos, 
             target_qvel, 
             phase,
-            self.last_action # <--- JITTER FIX
+            self.last_action
         ]).astype(np.float32)
 
     def render(self):

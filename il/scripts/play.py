@@ -5,7 +5,7 @@ import numpy as np
 import mujoco
 import mujoco.viewer
 
-# --- CONFIGURATION ---
+# Configuration
 XML_PATH = "models/recorder_model.xml"
 TRAJ_PATH = "expert_trajectory_full.npy"
 # Update this to your latest checkpoint
@@ -13,7 +13,7 @@ MODEL_PATH = "runs/checkpoints/handstand_model_10800000_steps.zip"
 
 sys.path.append(os.getcwd())
 
-# Try imports
+# Attempt imports for Policy Mode
 try:
     from envs.handstand_env import HandstandEnv
     HAS_ENV = True
@@ -28,9 +28,7 @@ except ImportError:
     HAS_SB3 = False
     print("Warning: Stable Baselines3 not found. Policy mode disabled.")
 
-# ---------------------------------------------------------
-# HELPER: LOAD DATA
-# ---------------------------------------------------------
+# Helper: Load Trajectory Data
 def load_traj_data():
     try:
         raw_data = np.load(TRAJ_PATH, allow_pickle=True)
@@ -46,9 +44,8 @@ def load_traj_data():
         print(f"Error loading {TRAJ_PATH}: {e}")
         return None, None
 
-# ---------------------------------------------------------
-# MODE 1: VISUAL REPLAY (GHOST MODE - LOOPING)
-# ---------------------------------------------------------
+# Mode 1: Visual Replay (Ghost Mode)
+# Teleports the robot through the trajectory frames without physics integration.
 def replay_trajectory_visual():
     states, play_dt = load_traj_data()
     if states is None: return
@@ -64,29 +61,28 @@ def replay_trajectory_visual():
     
     with mujoco.viewer.launch_passive(m, d) as viewer:
         while viewer.is_running():
-            # INNER LOOP: Play one full trajectory
+            # Play one full trajectory loop
             for i, state in enumerate(states):
                 loop_start = time.time()
                 if not viewer.is_running(): break
                 
-                # TELEPORT
+                # Teleport state
                 n_qpos = m.nq
                 d.qpos[:] = state[:n_qpos]
                 
                 mujoco.mj_forward(m, d)
                 viewer.sync()
                 
-                # Sync Speed
+                # Sync playback speed
                 process_time = time.time() - loop_start
                 sleep_time = play_dt - process_time
                 if sleep_time > 0: time.sleep(sleep_time)
             
-            # Pause briefly before restarting
+            # Pause briefly before restarting loop
             time.sleep(0.5)
 
-# ---------------------------------------------------------
-# MODE 2: RUN TRAINED POLICY (AI - ALREADY LOOPS)
-# ---------------------------------------------------------
+# Mode 2: Run Trained Policy
+# Executes the PPO agent within the Gymnasium environment with full physics.
 def run_policy():
     if not HAS_ENV or not HAS_SB3: return
     if not os.path.exists(MODEL_PATH):
@@ -107,9 +103,8 @@ def run_policy():
     finally:
         env.close()
 
-# ---------------------------------------------------------
-# MODE 3: PHYSICS VALIDATION (MOCAP TRACKING - LOOPING)
-# ---------------------------------------------------------
+# Mode 3: Physics Validation
+# Attempts to drive motors to match the recording using direct control inputs.
 def test_physics_feasibility():
     states, play_dt = load_traj_data()
     if states is None: return
@@ -125,13 +120,13 @@ def test_physics_feasibility():
 
     with mujoco.viewer.launch_passive(m, d) as viewer:
         while viewer.is_running():
-            # 1. RESET Physics to Start Frame
+            # Reset physics to start frame
             mujoco.mj_resetData(m, d)
             d.qpos[:] = states[0]
             d.qvel[:] = 0
-            mujoco.mj_forward(m, d) # Update physics state to match reset
+            mujoco.mj_forward(m, d) 
             
-            # 2. RUN LOOP
+            # Run loop
             for i, target_state in enumerate(states):
                 loop_start = time.time()
                 if not viewer.is_running(): break
@@ -146,7 +141,7 @@ def test_physics_feasibility():
                 mujoco.mj_step(m, d)
                 viewer.sync()
                 
-                # Sync Speed
+                # Sync playback speed
                 process_time = time.time() - loop_start
                 sleep_time = play_dt - process_time
                 if sleep_time > 0: time.sleep(sleep_time)
@@ -154,9 +149,7 @@ def test_physics_feasibility():
             # Pause before resetting for the next loop
             time.sleep(1.0)
 
-# ---------------------------------------------------------
-# MAIN
-# ---------------------------------------------------------
+# Main Execution
 if __name__ == "__main__":
     print("\nSelect Mode:")
     print("1. Replay Expert Trajectory (Visual Ghost)")
