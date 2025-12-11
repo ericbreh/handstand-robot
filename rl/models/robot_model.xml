@@ -6,8 +6,9 @@
 
     <default>
         <!-- Increased armature for stability with high torque -->
-        <joint armature="0.02" damping="0.1" limited="true"/>
-        <geom conaffinity="1" condim="3" friction="1.0 0.5 0.5" solimp="0.9 0.95 0.001" solref="0.02 1"/>
+        <joint limited="true"/>
+        <geom friction="0.7 0.005 0.0001"/>
+        <!-- <geom conaffinity="1" condim="3" friction="1.0 0.5 0.5" solimp="0.9 0.95 0.001" solref="0.02 1"/> -->
     </default>
 
     <visual>
@@ -51,15 +52,15 @@
 
             <!-- LEGS (Sideways Config) -->
             <body name="right_leg" pos="0 -0.19 -0.3">
-                <joint name="joint_q3" type="hinge" axis="-1 0 0" range="0 90"/>
+                <joint name="joint_q3" type="hinge" axis="-1 0 0" range="-10 90"/>
                 <geom name="right_leg_geom" type="capsule" fromto="0 0 0 0 0 -0.9" size="0.06" mass="12" material="LegMat"/>
-                <site name="right_foot_site" pos="0 0 -0.9" size="0.05" type="sphere" rgba="0 0.9 0.9 0.5"/>
+                <site name="right_foot_site" pos="0 0 -0.95" size="0.05" type="sphere" rgba="0 0.9 0.9 0.5"/>
             </body>
 
             <body name="left_leg" pos="0 0.19 -0.3">
-                <joint name="joint_q4" type="hinge" axis="1 0 0" range="0 90"/>
+                <joint name="joint_q4" type="hinge" axis="1 0 0" range="-10 90"/>
                 <geom name="left_leg_geom" type="capsule" fromto="0 0 0 0 0 -0.9" size="0.06" mass="12" material="LegMat"/>
-                <site name="left_foot_site" pos="0 0 -0.9" size="0.05" type="sphere" rgba="0 0.9 0.9 0.5"/>
+                <site name="left_foot_site" pos="0 0 -0.95" size="0.05" type="sphere" rgba="0 0.9 0.9 0.5"/>
             </body>
 
         </body>

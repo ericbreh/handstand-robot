@@ -5,12 +5,13 @@ from gymnasium.envs.registration import register
 import os
 import glob
 import time
+import argparse
 
 # 1. Register the environment (must match training)
 register(
     id="FiveLinkCartwheel-v0",
     entry_point="envs.five_link_env:FiveLinkCartwheelEnv",
-    max_episode_steps=500,
+    max_episode_steps=400,
 )
 
 
@@ -36,7 +37,7 @@ def get_latest_run_dir(runs_dir="./runs"):
     return latest_run
 
 
-def play_latest():
+def play_latest(checkpoint_path=None):
     latest_dir = get_latest_run_dir()
     if not latest_dir:
         return
@@ -47,9 +48,17 @@ def play_latest():
     final_model_path = os.path.join(latest_dir, "final_model.zip")
     stats_path = os.path.join(latest_dir, "vec_normalize.pkl")
 
+    # If a specific checkpoint is provided, use it
+    if checkpoint_path:
+        if not os.path.exists(checkpoint_path):
+            print(f"Error: Specified checkpoint '{checkpoint_path}' not found.")
+            return
+        model_to_load = checkpoint_path
+        print(f"Using specified checkpoint: {model_to_load}")
     # Check if final model exists, otherwise look for checkpoints
-    model_to_load = final_model_path
-    if not os.path.exists(final_model_path):
+    elif os.path.exists(final_model_path):
+        model_to_load = final_model_path
+    else:
         print("Final model not found. Checking for checkpoints...")
         ckpt_dir = os.path.join(latest_dir, "checkpoints")
         if os.path.exists(ckpt_dir):
@@ -100,11 +109,18 @@ def play_latest():
             # Deterministic=True generally performs better for testing
             action, _ = model.predict(obs, deterministic=True)
 
+            # Access underlying MuJoCo env through the wrappers
+            base_env = env.venv.envs[0].unwrapped
+
             obs, reward, done, info = env.step(action)
-            print(reward)
-            env.render()
-            # Slow down slightly to make it watchable (MuJoCo is very fast)
-            # time.sleep(1.0 / 40.0)
+            print(f"Reward: {reward[0]:.3f}")
+            if info[0]:
+                print("Reward Components:")
+                for key, value in info[0].items():
+                    if isinstance(value, float):
+                        print(f"  {key}: {value:.3f}")
+
+            time.sleep(1.0 / 40.0)
 
     except KeyboardInterrupt:
         print("\nStopped by user.")
@@ -113,4 +129,15 @@ def play_latest():
 
 
 if __name__ == "__main__":
-    play_latest()
+    parser = argparse.ArgumentParser(
+        description="Play a trained PPO agent for the FiveLinkCartwheel environment."
+    )
+    parser.add_argument(
+        "-c",
+        "--checkpoint",
+        type=str,
+        help="Path to a specific checkpoint file to play.",
+    )
+    args = parser.parse_args()
+
+    play_latest(checkpoint_path=args.checkpoint)

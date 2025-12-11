@@ -4,10 +4,12 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
+from stable_baselines3.common.noise import NormalActionNoise
 import os
 import datetime
 import time
 import glob
+import numpy as np
 
 # Import the environment class
 from envs.five_link_env import FiveLinkCartwheelEnv
@@ -16,13 +18,13 @@ from envs.five_link_env import FiveLinkCartwheelEnv
 register(
     id="FiveLinkCartwheel-v0",
     entry_point="envs.five_link_env:FiveLinkCartwheelEnv",
-    max_episode_steps=500,
+    max_episode_steps=400,
 )
 
 # --- CONFIGURATION ---
 CONTINUE_FROM_LATEST = False  # <--- CHANGED: Forces a fresh start
 TOTAL_TIMESTEPS = 1_000_000
-SAVE_FREQ = 20_000
+SAVE_FREQ = 12_500
 
 
 # --- CUSTOM CALLBACK TO SAVE MATCHED STATS ---
@@ -47,7 +49,7 @@ class SaveMatchedStatsCallback(BaseCallback):
             ckpt_dir = os.path.join(self.save_path, "checkpoints")
             os.makedirs(ckpt_dir, exist_ok=True)
 
-            versioned_filename = f"vec_normalize_{self.n_calls*4.0}_steps.pkl"
+            versioned_filename = f"vec_normalize_{self.n_calls*8.0}_steps.pkl"
             versioned_path = os.path.join(ckpt_dir, versioned_filename)
 
             self.training_env.save(versioned_path)
@@ -85,7 +87,7 @@ def train_agent():
     print(f"--- STARTING NEW RUN: {run_name} ---")
 
     env_id = "FiveLinkCartwheel-v0"
-    vec_env = make_vec_env(env_id, n_envs=8, seed=0, vec_env_cls=SubprocVecEnv)
+    vec_env = make_vec_env(env_id, n_envs=8, seed=0, vec_env_cls=DummyVecEnv)
 
     model = None
     previous_run = get_previous_run(current_run_name=run_name)
@@ -96,22 +98,29 @@ def train_agent():
     else:
         # Start Fresh: Create new normalization wrapper
         print("Starting training from scratch (No previous run loaded).")
-        vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
+        vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
+
+    n_actions = vec_env.action_space.shape[-1]
+    action_noise = NormalActionNoise(
+        mean=np.zeros(n_actions), sigma=0.3 * np.ones(n_actions)
+    )
 
     if model is None:
         model = PPO(
             "MlpPolicy",
             vec_env,
+            # action_noise=action_noise,
             verbose=1,
-            learning_rate=3e-4,
-            n_steps=2048,
-            batch_size=64,
+            learning_rate=1e-3,
+            n_steps=512,
+            batch_size=32,
             n_epochs=10,
             gamma=0.99,
             gae_lambda=0.95,
-            clip_range=0.2,
-            ent_coef=0.1,
+            clip_range=0.3,
+            ent_coef=0.05,
             tensorboard_log=log_dir,
+            seed=0,
         )
 
     print(f"Training for {TOTAL_TIMESTEPS/1e6:.1f}M steps...")

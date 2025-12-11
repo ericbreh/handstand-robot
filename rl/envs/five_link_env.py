@@ -3,6 +3,7 @@ import gymnasium as gym
 from gymnasium.envs.mujoco import MujocoEnv
 from gymnasium.spaces import Box
 from os import path
+import mujoco
 
 MODEL_PATH = path.join(path.dirname(__file__), "..", "models", "robot_model.xml")
 
@@ -22,9 +23,10 @@ class FiveLinkCartwheelEnv(MujocoEnv):
             observation_space=observation_space,
             **kwargs,
         )
+        self._step_count = 0
 
     def _get_obs(self):
-        obs_pos = self.data.qpos.flat.copy()
+        obs_pos = self.data.qpos.flat[1:].copy()
         velocity_data = self.data.qvel.flat.copy()
         sensor_data = self.data.sensordata.flat.copy()
         return np.concatenate([obs_pos, velocity_data, sensor_data]).astype(np.float64)
@@ -32,64 +34,124 @@ class FiveLinkCartwheelEnv(MujocoEnv):
     def step(self, action):
         self.do_simulation(action, self.frame_skip)
 
-        # --- Extract sensor and state data ---
-        torso_z_position = self.data.body("torso").xpos[2]
+        # Check if simulation exploded
+        if (
+            not np.isfinite(self.data.qpos).all()
+            or not np.isfinite(self.data.qvel).all()
+        ):
+            obs = np.zeros(25, dtype=np.float64)
+            return obs, 0.0, True, False, {}
 
-        right_foot_contact = self.data.sensor("touch_right_foot").data[0] > 0
-        left_foot_contact = self.data.sensor("touch_left_foot").data[0] > 0
+        self._step_count += 1
+        info = {}
 
-        # --- Curriculum Task 1: Balance on the Right Leg (Corrected) ---
+        torso_z = self.data.body("torso").xpos[2]
+        rot_matrix = self.data.body("torso").xmat.reshape(3, 3)
+        verticality = rot_matrix[2, 2]
 
-        reward = 0.0  # Initialize to neutral
+        reward = 0.0
 
-        # If goal achieved, give large positive reward
-        if right_foot_contact and not left_foot_contact:
-            reward = 2.0
-        # If left foot is on ground (either alone or with right), apply penalty
-        elif left_foot_contact:
-            reward = -1.5
-        #
-        # # Stability Penalty: Encourage smooth, minimal movement
-        # stability_cost = -0.01 * (
-        #     np.sum(np.square(self.data.qvel)) + np.sum(np.square(action))
-        # )
-        # reward += stability_cost # Add stability cost to the main reward
-        #
-        # --- Termination Conditions ---
-        # Terminate if the torso falls too low
-        terminated = torso_z_position < 0.7
-        if terminated:
-            reward = -20.0  # Heavy penalty for falling
+        # HAND CONTACT
+        left_hand_on_ground = False
+        right_hand_on_ground = False
+        ground_geom_id = self.model.geom("ground").id
+        left_arm_geom_id = self.model.geom("left_arm_geom").id
+        right_arm_geom_id = self.model.geom("right_arm_geom").id
 
-        return self._get_obs(), reward, terminated, False, {}
+        for i in range(self.data.ncon):
+            contact = self.data.contact[i]
+            if (
+                contact.geom1 == left_arm_geom_id and contact.geom2 == ground_geom_id
+            ) or (
+                contact.geom1 == ground_geom_id and contact.geom2 == left_arm_geom_id
+            ):
+                left_hand_on_ground = True
+            if (
+                contact.geom1 == right_arm_geom_id and contact.geom2 == ground_geom_id
+            ) or (
+                contact.geom1 == ground_geom_id and contact.geom2 == right_arm_geom_id
+            ):
+                right_hand_on_ground = True
 
-    def reset_model(self):
-        """
-        Resets the model to a randomly perturbed initial state.
-        This is crucial for training a robust policy.
-        """
-        # Define the magnitude of the random noise
-        pos_noise_magnitude = 0.02
-        vel_noise_magnitude = 0.1
+        hand_contact_reward = 0.0
+        if left_hand_on_ground and right_hand_on_ground:
+            hand_contact_reward += 100.0
+        info["hand_contact_reward"] = hand_contact_reward
+        reward += hand_contact_reward
 
-        # Generate random noise centered around zero
-        # self.np_random is seeded by the parent's reset() method
-        qpos_noise = self.np_random.uniform(
-            low=-pos_noise_magnitude,
-            high=pos_noise_magnitude,
-            size=self.init_qpos.shape,
+        # LEG CONTACT
+        left_foot_on_ground = False
+        right_foot_on_ground = False
+        ground_geom_id = self.model.geom("ground").id
+        left_leg_geom_id = self.model.geom("left_leg_geom").id
+        right_leg_geom_id = self.model.geom("right_leg_geom").id
+
+        for i in range(self.data.ncon):
+            contact = self.data.contact[i]
+            if (
+                contact.geom1 == left_leg_geom_id and contact.geom2 == ground_geom_id
+            ) or (
+                contact.geom1 == ground_geom_id and contact.geom2 == left_leg_geom_id
+            ):
+                left_foot_on_ground = True
+            if (
+                contact.geom1 == right_leg_geom_id and contact.geom2 == ground_geom_id
+            ) or (
+                contact.geom1 == ground_geom_id and contact.geom2 == right_leg_geom_id
+            ):
+                right_foot_on_ground = True
+
+        # ONE HAND ONE FOOT PENALTY
+        one_hand_one_foot_penalty = 0.0
+        if (
+            (left_hand_on_ground or right_hand_on_ground)
+            and (left_foot_on_ground or right_foot_on_ground)
+            and not (left_hand_on_ground and right_hand_on_ground)
+            and not (left_foot_on_ground and right_foot_on_ground)
+        ):
+            one_hand_one_foot_penalty = -50.0
+        info["one_hand_one_foot_penalty"] = one_hand_one_foot_penalty
+        reward += one_hand_one_foot_penalty
+
+        # SUSTAINED BALANCE REWARD
+        sustained_balance_reward = 0.0
+        if (left_hand_on_ground and right_hand_on_ground) and (
+            not left_foot_on_ground and not right_foot_on_ground
+        ):
+            sustained_balance_reward = 100.0
+        info["sustained_balance_reward"] = sustained_balance_reward
+        reward += sustained_balance_reward
+
+        # INVERSION REWARD
+        inversion_reward = 100.0 * (1.0 - np.sqrt(np.maximum(verticality + 1.0, 0.0)))
+        info["inversion_reward"] = inversion_reward
+        reward += inversion_reward
+
+        terminated = False
+        termination_penalty = 0.0
+        if torso_z < 0.5:
+            terminated = True
+            termination_penalty = -200.0
+        info["termination_penalty"] = termination_penalty
+        reward += termination_penalty
+
+        if self.render_mode == "human":
+            self.render()
+
+        return self._get_obs(), reward, terminated, False, info
+
+    def reset_model(self, seed=None):
+        noise_low = -0.05
+        noise_high = 0.05
+        qpos = self.init_qpos + self.np_random.uniform(
+            low=noise_low, high=noise_high, size=self.model.nq
         )
-        qvel_noise = self.np_random.uniform(
-            low=-vel_noise_magnitude,
-            high=vel_noise_magnitude,
-            size=self.init_qvel.shape,
+        qvel = self.init_qvel + self.np_random.uniform(
+            low=noise_low, high=noise_high, size=self.model.nv
         )
 
-        # Combine initial state with noise
-        noisy_qpos = self.init_qpos + qpos_noise
-        noisy_qvel = self.init_qvel + qvel_noise
-
-        # Set the new, noisy initial state
-        self.set_state(noisy_qpos, noisy_qvel)
-
+        qpos[3] = 2.7
+        qpos[4] = 2.7
+        self.set_state(qpos, qvel)
+        self._step_count = 0
         return self._get_obs()
