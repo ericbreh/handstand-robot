@@ -49,39 +49,6 @@ TOTAL_TIME = 7.0
 
 # best physics version so far
 # [Time, RootX, RootZ, Pitch,  RArm, LArm,  RHip, RKnee,  LHip, LKnee]
-# keyframes = [
-#     # 1. START (0.0s): Standing Tall
-#     [0.0,   0.0,  0.0,    0,    160, 160,    0,   0,      0,   0],
-
-#     # 2. SQUAT (0.8s): Load the Springs
-#     # FIX: Kept Hips near 0. Previous '50' moved feet forward, causing a slip later.
-#     # Knees bent (-70) -> Body drops (-0.35).
-#     # Feet are now directly under the center of mass (Stable).
-#     [0.7,   0.0,  -0.35,    0,    150, 150,    -10,   70,    -10,   70],
-
-#     # 3. Straighten backfoot 
-#     [1.1,   0.2,  -0.35,    40,    120, 100,    0,   0,    -20,   40],
-
-#     # 4. PUSH OFF (2.4s): The "Power Drive"
-#     # Left Leg kicks HARD back (-90).
-#     # Geometry Check: Leg extends 0.9m back -> Root moves 0.2 -> 1.3 (1.1m gain).
-#     # This matches the physics of a push-off.
-#     [1.5,   1.3,  -0.40,  90,     60,  60,    80,   0,     -90,   0],
-
-#     # 5. HANDSTAND (4.0s): Inversion
-#     # Root continues forward to 2.2m.
-#     # Pitch hits 180.
-#     [3.0,   2.2,  -0.35, 180,     10,  10,    90,   0,     -90,   0],
-
-#     # 6. HOLD (6.0s)
-#     [5.0,   2.2,  -0.35, 180,     10,  10,    0,   0,      0,   0],
-
-#     # 7. END
-#     [7.0,   2.2,  -0.35, 180,     10,  10,    0,   0,      0,   0],
-# ]
-
-# Best physics version
-# [Time, RootX, RootZ, Pitch,  RArm, LArm,  RHip, RKnee,  LHip, LKnee]
 keyframes = [
     # 1. START (0.0s): Standing Tall
     [0.0,   0.0,  0.0,    0,    160, 160,    0,   0,      0,   0],
@@ -90,28 +57,61 @@ keyframes = [
     # FIX: Kept Hips near 0. Previous '50' moved feet forward, causing a slip later.
     # Knees bent (-70) -> Body drops (-0.35).
     # Feet are now directly under the center of mass (Stable).
-    [0.5,   0.0,  -0.35,    0,    150, 150,    -10,   80,    -10,   80],
+    [0.7,   0.0,  -0.35,    0,    150, 150,    -10,   70,    -10,   70],
 
     # 3. Straighten backfoot 
-    [0.8,   0.2,  -0.35,    40,    120, 70,    0,   0,    -20,   60],
+    [1.1,   0.2,  -0.35,    40,    120, 100,    0,   0,    -20,   40],
 
     # 4. PUSH OFF (2.4s): The "Power Drive"
     # Left Leg kicks HARD back (-90).
     # Geometry Check: Leg extends 0.9m back -> Root moves 0.2 -> 1.3 (1.1m gain).
     # This matches the physics of a push-off.
-    [1.3,   0.8,  -0.40,  90,    80,  60,    80,   0,     -90,   0],
+    [1.5,   1.3,  -0.40,  90,     60,  60,    80,   0,     -90,   0],
 
     # 5. HANDSTAND (4.0s): Inversion
     # Root continues forward to 2.2m.
     # Pitch hits 180.
-    [2.6,   1.5,  -0.35, 180,     20,  20,    80,   0,     -80,   0],
+    [3.0,   2.2,  -0.35, 180,     10,  10,    90,   0,     -90,   0],
 
     # 6. HOLD (6.0s)
-    [5.0,   1.5,  -0.35, 180,     10,  10,    0,   0,      0,   0],
+    [5.0,   2.2,  -0.35, 180,     10,  10,    0,   0,      0,   0],
 
     # 7. END
-    [7.0,   1.5,  -0.35, 180,     10,  10,    0,   0,      0,   0],
+    [7.0,   2.2,  -0.35, 180,     10,  10,    0,   0,      0,   0],
 ]
+
+# Best physics version
+# [Time, RootX, RootZ, Pitch,  RArm, LArm,  RHip, RKnee,  LHip, LKnee]
+# keyframes = [
+#     # 1. START (0.0s): Standing Tall
+#     [0.0,   0.0,  0.0,    0,    160, 160,    0,   0,      0,   0],
+
+#     # 2. SQUAT (0.8s): Load the Springs
+#     # FIX: Kept Hips near 0. Previous '50' moved feet forward, causing a slip later.
+#     # Knees bent (-70) -> Body drops (-0.35).
+#     # Feet are now directly under the center of mass (Stable).
+#     [0.5,   0.0,  -0.35,    0,    150, 150,    -10,   80,    -10,   80],
+
+#     # 3. Straighten backfoot 
+#     [0.8,   0.2,  -0.35,    40,    120, 70,    0,   0,    -20,   60],
+
+#     # 4. PUSH OFF (2.4s): The "Power Drive"
+#     # Left Leg kicks HARD back (-90).
+#     # Geometry Check: Leg extends 0.9m back -> Root moves 0.2 -> 1.3 (1.1m gain).
+#     # This matches the physics of a push-off.
+#     [1.3,   0.8,  -0.40,  90,    80,  60,    80,   0,     -90,   0],
+
+#     # 5. HANDSTAND (4.0s): Inversion
+#     # Root continues forward to 2.2m.
+#     # Pitch hits 180.
+#     [2.6,   1.5,  -0.35, 180,     20,  20,    80,   0,     -80,   0],
+
+#     # 6. HOLD (6.0s)
+#     [5.0,   1.5,  -0.35, 180,     10,  10,    0,   0,      0,   0],
+
+#     # 7. END
+#     [7.0,   1.5,  -0.35, 180,     10,  10,    0,   0,      0,   0],
+# ]
 
 # --- 1. SPLINE GENERATION ---
 kf_data = np.array(keyframes)

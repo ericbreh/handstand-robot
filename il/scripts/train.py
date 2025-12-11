@@ -53,7 +53,7 @@ if __name__ == "__main__":
     
     # 2 Million steps is a good target. 
     # With 4 envs, this will finish 4x faster than your previous script.
-    model.learn(total_timesteps=8_000_000, callback=checkpoint_callback)
+    model.learn(total_timesteps=15_000_000, callback=checkpoint_callback)
 
     # 5. Save Final
     model.save("handstand_final")

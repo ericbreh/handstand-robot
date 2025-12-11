@@ -9,7 +9,7 @@ import mujoco.viewer
 XML_PATH = "models/recorder_model.xml"
 TRAJ_PATH = "expert_trajectory_full.npy"
 # Update this to your latest checkpoint
-MODEL_PATH = "runs/checkpoints/handstand_model_2400000_steps.zip" 
+MODEL_PATH = "runs/checkpoints/handstand_model_10800000_steps.zip" 
 
 sys.path.append(os.getcwd())
 
