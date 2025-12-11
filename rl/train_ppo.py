@@ -2,7 +2,7 @@ import gymnasium as gym
 from gymnasium.envs.registration import register
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
 from stable_baselines3.common.noise import NormalActionNoise
 import os

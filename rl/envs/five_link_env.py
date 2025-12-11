@@ -16,7 +16,7 @@ class FiveLinkCartwheelEnv(MujocoEnv):
 
     def __init__(self, **kwargs):
         gym.utils.EzPickle.__init__(self, **kwargs)
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(26,), dtype=np.float64)
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(25,), dtype=np.float64)
         super().__init__(
             model_path=MODEL_PATH,
             frame_skip=5,
