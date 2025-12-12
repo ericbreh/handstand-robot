@@ -4,7 +4,7 @@ import time
 import os
 
 # Define the path to your MuJoCo XML model
-MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', 'robot_model.xml')
+MODEL_PATH = os.path.join(os.path.dirname(__file__), '../models', 'recorder_model.xml')
 
 def visualize_model():
     """
@@ -18,36 +18,20 @@ def visualize_model():
 
     try:
         # Load the model and data
-        # This is the most direct way to check if the XML is valid
         model = mujoco.MjModel.from_xml_path(MODEL_PATH)
         data = mujoco.MjData(model)
-
-        data.qpos[3] = 2.7
-        data.qpos[4] = 2.7
-    
+        
         print("Model loaded successfully! XML is valid.")
         print("Launching MuJoCo viewer... (Press ESC to exit)")
 
         # Launch the viewer
         with mujoco.viewer.launch_passive(model, data) as viewer:
-
+            
             # Simple simulation loop
             while viewer.is_running():
                 # Step the physics
                 mujoco.mj_step(model, data)
-
-                com_position = data.subtree_com[model.body("world").id]
-
-
-                right_foot_pos = data.site("right_foot_site").xpos
-                left_foot_pos = data.site("left_foot_site").xpos
-
-                print(f"COM position: {com_position}")
-                print(f"Right foot position: {right_foot_pos}")
-                print(f"Left foot position: {left_foot_pos}")
-
-
-
+                
                 # Sync the viewer with the physics state
                 viewer.sync()
                 
