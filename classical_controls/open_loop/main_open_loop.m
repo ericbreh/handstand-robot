@@ -80,12 +80,21 @@ for j = 1:height(x_gait)
 end
 
 figure(1);
-plot(t_gait, y_gait);
+subplot(2, 1, 1);
+plot(t_gait, y_gait(:,1), 'r', ...   % red
+     t_gait, y_gait(:,2), 'g', ...   % green
+     t_gait, y_gait(:,3), 'b', ...   % blue
+     t_gait, y_gait(:,4), 'k');      % black
+legend('y_1', 'y_2', 'y_3', 'y_4');
 
+subplot(2, 1, 2);
+plot(t_gait, F_st_gait(:, 1), 'r', ...
+     t_gait, F_st_gait(:, 2), 'g');
+legend("Horizontal Force", "Vertical Force");
 
 %% Hand Plant
 i = i + 1;
-q_des = [pi - pi/2; pi + pi/2; pi - pi/2; -pi/4; 2*pi/3];
+q_des = [pi - pi/2; pi + pi/2; pi - pi/2; 0; 2*pi/3];
 params.th_des = params.T*q_des + params.d;
 
 options = odeset('Events', @five_link_plant_OL_event);
@@ -111,13 +120,17 @@ for j = 1:height(x_hp)
 end
 
 figure(2);
-plot(t_hp, y_hp);
-figure(3); hold on;
-plot(t_hp, th_hp);
-yline(params.th_des(3), 'r');
-yline(params.th_des(4), 'b');
-yline(params.th_des(5), 'g');
-legend("th_1", "th_2", "th_3", "th_4", "th_5");
+subplot(2, 1, 1);
+plot(t_hp, y_hp(:,1), 'r', ...   % red
+     t_hp, y_hp(:,2), 'g', ...   % green
+     t_hp, y_hp(:,3), 'b', ...   % blue
+     t_hp, y_hp(:,4), 'k');      % black
+legend('y_1', 'y_2', 'y_3', 'y_4');
+
+subplot(2, 1, 2);
+plot(t_hp, F_st_hp(:, 1), 'r', ...
+     t_hp, F_st_hp(:, 2), 'g');
+legend("Horizontal Force", "Vertical Force");
 
 %% Swing up
 i = i + 1;
@@ -146,14 +159,18 @@ for j = 1:height(x_su)
 
 end
 
-
-figure(4);
-plot(t_su, y_su);
+figure(3);
+subplot(2, 1, 1);
+plot(t_su, y_su(:,1), 'r', ...   % red
+     t_su, y_su(:,2), 'g', ...   % green
+     t_su, y_su(:,3), 'b', ...   % blue
+     t_su, y_su(:,4), 'k');      % black
 legend('y_1', 'y_2', 'y_3', 'y_4');
-figure(5); hold on;
-plot(t_su, th_su);
-yline(params.th_des);
-legend("th_1", "th_2", "th_3", "th_4", "th_5");
+
+subplot(2, 1, 2);
+plot(t_su, F_su(:, 1), 'r', ...
+     t_su, F_su(:, 2), 'g');
+legend("Horizontal Force", "Vertical Force");
 
 
 %% Animate
@@ -164,6 +181,8 @@ t_tot = vertcat(T{:});
 q_tot = x_tot(:, params.q_idx);
 qdot_tot = x_tot(:, params.qdot_idx);
 
+figure(1000);
+drawnow;
 animateFiveLink(t_tot, q_tot);
 
 
